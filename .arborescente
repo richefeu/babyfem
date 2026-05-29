@@ -1,0 +1,17 @@
+shearBar/
+│
+├─ 🐍 MODULES PYTHON (à importer)
+│  ├─ fem_solver.py              Solveur FEM pur [calcul seul]
+│  ├─ visualization.py           Visualisation [affichage seul]
+│  └─ test_integration.py        Tests [vérification]
+│
+├─ 📚 EXEMPLES (à exécuter)
+│  ├─ exemple_simple.py          3 cas basiques ⭐ COMMENCER ICI
+│  └─ exemple_avance.py          6 cas avancés
+│
+└─ 📖 DOCUMENTATION (à lire)
+   ├─ QUICKSTART.md              Démarrage 5min ⭐ À LIRE EN PREMIER
+   ├─ README.md                  Documentation complète
+   ├─ STRUCTURE.md               Architecture modulaire
+   ├─ INDEX.md                   Navigation (ce fichier)
+   └─ FICHIERS_PRINCIPAUX.txt    Guide détaillé

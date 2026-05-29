@@ -1,0 +1,143 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                 SOLVEUR ÉLASTICITÉ 2D - STRUCTURE MODULAIRE                ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌─ ARCHITECTURE EN 3 NIVEAUX ─────────────────────────────────────────────────┐
+│                                                                              │
+│  NIVEAU 3: PROBLÈMES & APPLICATIONS                                        │
+│  ├─ exemple_simple.py        [3 cas simples - À EXÉCUTER]                 │
+│  └─ exemple_avance.py        [6 cas avancés - À EXÉCUTER]                 │
+│                                                                              │
+│  NIVEAU 2: VISUALISATION                                                    │
+│  └─ visualization.py         [Module d'affichage]                          │
+│                                                                              │
+│  NIVEAU 1: CALCUL (Cœur)                                                   │
+│  └─ fem_solver.py            [Solveur FEM pur - Réutilisable]              │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+FICHIERS À UTILISER
+═══════════════════════════════════════════════════════════════════════════
+
+📌 POUR DÉBUTER RAPIDEMENT
+───────────────────────────────────────────────────────────────────────────
+Lire:    QUICKSTART.md
+Exécuter: python3 exemple_simple.py      ← 3 cas basiques
+         python3 exemple_avance.py      ← 6 cas avancés
+
+📌 POUR COMPRENDRE L'ARCHITECTURE
+───────────────────────────────────────────────────────────────────────────
+Lire:    STRUCTURE.md        ← Explication de la séparation
+         README.md           ← Documentation complète
+
+📌 POUR DÉVELOPPER VOS CAS
+───────────────────────────────────────────────────────────────────────────
+Importer: from fem_solver import ElasticityFEM2D
+         from visualization import ElasticityVisualizer
+
+📌 VÉRIFIER QUE TOUT FONCTIONNE
+───────────────────────────────────────────────────────────────────────────
+Exécuter: python3 test_integration.py   ← Tous les tests
+
+SÉPARATION DES RESPONSABILITÉS
+═══════════════════════════════════════════════════════════════════════════
+
+┌─ fem_solver.py ────────────────────────────────────────────────────────────┐
+│ • Classe ElasticityFEM2D                                                    │
+│ • Cœur du calcul FEM uniquement                                            │
+│ • Dépendances: numpy, scipy                                                │
+│ • PAS de matplotlib                                                         │
+│ • Réutilisable dans autres projets                                         │
+│                                                                              │
+│ Méthodes principales:                                                       │
+│   - .solve(boundary_conditions)     ← Résoudre                             │
+│   - .compute_stress()               ← Calculer contraintes                 │
+│   - .von_mises()                    ← Contrainte équivalente              │
+│   - .get_results()                  ← Exporter tous les résultats         │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ visualization.py ─────────────────────────────────────────────────────────┐
+│ • Classe ElasticityVisualizer (statique)                                   │
+│ • Affichage indépendant du solveur                                         │
+│ • Dépendances: numpy, matplotlib                                           │
+│ • PAS de solveur intégré                                                   │
+│ • Facilement swappable (matplotlib → plotly → autre)                       │
+│                                                                              │
+│ Méthodes principales:                                                       │
+│   - .plot_displacement_and_stress()   ← Vue 2×2                            │
+│   - .plot_deformed_geometry()        ← Géométrie déformée                │
+│   - .plot_von_mises()               ← Contrainte équivalente              │
+│   - .plot_stress_component()        ← σxx, σyy, σxy                      │
+│   - .compare_results()              ← Comparer plusieurs cas              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ exemple_simple.py & exemple_avance.py ────────────────────────────────────┐
+│ • Cas d'utilisation concrets                                               │
+│ • Dépendent de fem_solver.py et visualization.py                          │
+│ • À exécuter ou à adapter pour vos besoins                                 │
+│ • Point de départ idéal pour apprendre                                     │
+└────────────────────────────────────────────────────────────────────────────┘
+
+UTILISATION TYPIQUE
+═══════════════════════════════════════════════════════════════════════════
+
+1️⃣  DÉBUT RAPIDE
+   python3 exemple_simple.py
+
+2️⃣  VOTRE CAS PERSONNALISÉ
+   from fem_solver import ElasticityFEM2D
+   from visualization import ElasticityVisualizer
+   
+   problem = ElasticityFEM2D(10, 5, 31, 16, 200e9, 0.3)
+   problem.solve({'bottom': [(1,0)], 'top': [(1,0.02)], ...})
+   problem.compute_stress()
+   ElasticityVisualizer.plot_von_mises(problem)
+
+3️⃣  BATCH PROCESSING
+   from fem_solver import ElasticityFEM2D
+   
+   for E in [100e9, 200e9, 300e9]:
+       problem = ElasticityFEM2D(10, 5, 31, 16, E, 0.3)
+       problem.solve(bc)
+       results = problem.get_results()
+       # Traiter les résultats...
+
+4️⃣  INTÉGRATION DANS AUTRE PROJET
+   # Importer juste fem_solver
+   # Utiliser votre propre système d'affichage
+
+FICHIERS DE DOCUMENTATION
+═══════════════════════════════════════════════════════════════════════════
+
+📄 QUICKSTART.md          ← Commencer ici (5 min de lecture)
+📄 README.md              ← Documentation complète
+📄 STRUCTURE.md           ← Architecture détaillée
+📄 FICHIERS_PRINCIPAUX.txt ← Ce fichier
+
+FICHIERS À IGNORER (héritage)
+═══════════════════════════════════════════════════════════════════════════
+
+⚠️  elasticite_2d.py           ← Version intégrée (héritage)
+⚠️  exemples_avances.py        ← Version intégrée (héritage)
+⚠️  README_ELASTICITE.md       ← Documentation héritage
+
+→ Utiliser plutôt: fem_solver.py + visualization.py
+
+STATUT
+═════════════════════════════════════════════════════════════════════════════
+
+✅ fem_solver.py           - Complètement fonctionnel
+✅ visualization.py        - Complètement fonctionnel
+✅ exemple_simple.py       - 3 cas testés et validés
+✅ exemple_avance.py       - 6 cas testés et validés
+✅ test_integration.py     - Tous les tests passent
+
+PROCHAINES ÉTAPES
+═════════════════════════════════════════════════════════════════════════════
+
+1. Lire QUICKSTART.md (5 min)
+2. Exécuter exemple_simple.py
+3. Adapter pour votre cas
+4. Consulter README.md ou STRUCTURE.md au besoin
+
+BON CALCUL! 🚀
