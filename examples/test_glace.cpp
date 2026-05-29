@@ -101,6 +101,11 @@ int main() {
     // Utiliser la méthode solve() du solveur avec les deux types de BC
     problem.solve(bcs, node_bcs);
 
+    // Note: Alternative sparse solver avec Conjugate Gradient disponible:
+    // SparseSolver::Options opts;
+    // opts.verbose = true;  // Affiche la convergence
+    // problem.solve_sparse(bcs, node_bcs, opts);
+
     std::cout << "Calcul des contraintes...\n";
     problem.compute_stress();
 

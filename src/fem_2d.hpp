@@ -1,6 +1,8 @@
 #pragma once
 #include "matrix.hpp"
 #include "solver.hpp"
+#include "sparse_matrix.hpp"
+#include "sparse_solver.hpp"
 #include <cmath>
 #include <map>
 #include <array>
@@ -329,6 +331,104 @@ public:
             }
         }
 
+    }
+
+    // Résout le système avec conditions aux limites (version sparse avec Conjugate Gradient)
+    void solve_sparse(const std::map<std::string, std::vector<std::pair<int, double>>>& bcs,
+                      const std::vector<std::tuple<int, int, double>>& node_bcs = {},
+                      const SparseSolver::Options& solver_opts = SparseSolver::Options()) {
+        // Assembler en format triplet
+        std::vector<int> row_idx, col_idx;
+        std::vector<double> values;
+        std::vector<double> F(n_dof, 0.0);
+
+        for (int i = 0; i < nx; ++i) {
+            for (int j = 0; j < ny; ++j) {
+                // Ajouter les contributions de l'élément
+                if (i < nx - 1 && j < ny - 1) {
+                    Matrix K_local = local_stiffness_q1();
+                    std::array<int, 8> dofs = {
+                        dof_u(i, j), dof_v(i, j),
+                        dof_u(i+1, j), dof_v(i+1, j),
+                        dof_u(i+1, j+1), dof_v(i+1, j+1),
+                        dof_u(i, j+1), dof_v(i, j+1)
+                    };
+
+                    for (int local_i = 0; local_i < 8; ++local_i) {
+                        for (int local_j = 0; local_j < 8; ++local_j) {
+                            double val = K_local(local_i, local_j);
+                            if (std::abs(val) > 1e-15) {
+                                row_idx.push_back(dofs[local_i]);
+                                col_idx.push_back(dofs[local_j]);
+                                values.push_back(val);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Construire la matrice sparse
+        SparseMatrix K_sparse = SparseMatrix::from_triplet(n_dof, n_dof, row_idx, col_idx, values);
+
+        // Appliquer les conditions aux limites
+        apply_dirichlet_sparse(K_sparse, F, bcs, node_bcs);
+
+        // Résoudre avec Conjugate Gradient
+        std::vector<double> u_full = SparseSolver::solve_cg(K_sparse, F, solver_opts);
+
+        // Extraire u et v
+        if (static_cast<int>(u_full.size()) != n_dof) {
+            throw std::runtime_error("Solver result size mismatch");
+        }
+
+        for (int j = 0; j < ny; ++j) {
+            for (int i = 0; i < nx; ++i) {
+                int node = node_idx(i, j);
+                u[node] = u_full[dof_u(i, j)];
+                v[node] = u_full[dof_v(i, j)];
+            }
+        }
+    }
+
+    // Helper pour appliquer les BC sur matrice sparse (simplifié - utilise stratégie penalty)
+    void apply_dirichlet_sparse(SparseMatrix& K, std::vector<double>& F,
+                                const std::map<std::string, std::vector<std::pair<int, double>>>& bcs,
+                                const std::vector<std::tuple<int, int, double>>& node_bcs) {
+        const double penalty = 1e12;
+
+        // Appliquer les BC edge
+        for (const auto& [boundary, bc_list] : bcs) {
+            if (boundary == "nodes") continue;
+
+            int i_start = 0, i_end = nx - 1, j_start = 0, j_end = ny - 1;
+            if (boundary == "bottom") j_end = 0;
+            else if (boundary == "top") j_start = ny - 1;
+            else if (boundary == "left") i_end = 0;
+            else if (boundary == "right") i_start = nx - 1;
+            else continue;
+
+            for (int i = (boundary == "left" || boundary == "right") ? i_start : 0;
+                 i <= ((boundary == "left" || boundary == "right") ? i_end : nx - 1); ++i) {
+                for (int j = (boundary == "top" || boundary == "bottom") ? j_start : 0;
+                     j <= ((boundary == "top" || boundary == "bottom") ? j_end : ny - 1); ++j) {
+                    for (const auto& [comp, value] : bc_list) {
+                        int dof = (comp == 0) ? dof_u(i, j) : dof_v(i, j);
+                        // Penalty method: K(dof,dof) += penalty, F(dof) += penalty*value
+                        K.set(dof, dof, K.get(dof, dof) + penalty);
+                        F[dof] += penalty * value;
+                    }
+                }
+            }
+        }
+
+        // Appliquer les BC sur nœuds
+        for (const auto& [node_idx_val, comp, value] : node_bcs) {
+            auto [i, j] = get_coords(node_idx_val);
+            int dof = (comp == 0) ? dof_u(i, j) : dof_v(i, j);
+            K.set(dof, dof, K.get(dof, dof) + penalty);
+            F[dof] += penalty * value;
+        }
     }
 
     // Calcule les contraintes à partir des déplacements
