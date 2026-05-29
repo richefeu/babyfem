@@ -12,6 +12,9 @@ class SVGVisualization {
 private:
     const ElasticityFEM2D& fem_;
     double margin_ratio_;
+    double margin_x_px_;
+    double margin_y_px_;
+    bool use_pixel_margins_;
     double target_size_;
     double deform_scale_;
 
@@ -37,9 +40,17 @@ private:
 
     void compute_scales() {
         double max_dim = std::max(fem_.width, fem_.height);
-        scale_ = target_size_ / (max_dim * (1.0 + 2.0 * margin_ratio_));
-        margin_x_ = margin_ratio_ * fem_.width * scale_;
-        margin_y_ = margin_ratio_ * fem_.height * scale_;
+        scale_ = target_size_ / max_dim;
+
+        if (use_pixel_margins_) {
+            // Use pixel-based margins
+            margin_x_ = margin_x_px_;
+            margin_y_ = margin_y_px_;
+        } else {
+            // Use ratio-based margins
+            margin_x_ = margin_ratio_ * fem_.width * scale_;
+            margin_y_ = margin_ratio_ * fem_.height * scale_;
+        }
         scale_x_ = scale_;
         scale_y_ = scale_;
     }
@@ -48,6 +59,9 @@ public:
     SVGVisualization(const ElasticityFEM2D& fem)
         : fem_(fem),
           margin_ratio_(0.05),
+          margin_x_px_(50),
+          margin_y_px_(50),
+          use_pixel_margins_(false),
           target_size_(600.0),
           deform_scale_(100.0),
           show_mesh_(false),
@@ -64,7 +78,30 @@ public:
 
     // Configuration methods (return *this for chaining)
     SVGVisualization& margin(double ratio) {
+        use_pixel_margins_ = false;
         margin_ratio_ = ratio;
+        compute_scales();
+        return *this;
+    }
+
+    SVGVisualization& margin_x(double pixels) {
+        use_pixel_margins_ = true;
+        margin_x_px_ = pixels;
+        compute_scales();
+        return *this;
+    }
+
+    SVGVisualization& margin_y(double pixels) {
+        use_pixel_margins_ = true;
+        margin_y_px_ = pixels;
+        compute_scales();
+        return *this;
+    }
+
+    SVGVisualization& margins(double x_pixels, double y_pixels) {
+        use_pixel_margins_ = true;
+        margin_x_px_ = x_pixels;
+        margin_y_px_ = y_pixels;
         compute_scales();
         return *this;
     }

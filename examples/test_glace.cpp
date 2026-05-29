@@ -220,9 +220,9 @@ int main() {
         .stress_xy()
         .write("test_glace_stress_xy.svg");
 
-    // Deformed geometry with undeformed overlay
+    // Deformed geometry with undeformed overlay (using pixel-based margins)
     SVGVisualization(problem)
-        .margin(0.05)
+        .margins(40, 20)  // 40px horizontal, 20px vertical
         .width(600)
         .deform_scale(100.0)
         .mesh()
