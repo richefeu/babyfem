@@ -171,6 +171,20 @@ int main() {
 
     // Export SVG
     std::cout << "\nExport SVG...\n";
+
+    // Combine all support nodes
+    std::vector<int> all_supports;
+    all_supports.insert(all_supports.end(), appui_1.begin(), appui_1.end());
+    all_supports.insert(all_supports.end(), appui_2.begin(), appui_2.end());
+    all_supports.insert(all_supports.end(), appui_3.begin(), appui_3.end());
+
+    // Combine all load nodes
+    std::vector<int> all_loads;
+    all_loads.insert(all_loads.end(), zone_charge_1.begin(), zone_charge_1.end());
+    all_loads.insert(all_loads.end(), zone_charge_2.begin(), zone_charge_2.end());
+
+    // Visualizations
+    SVGGenerator::write_mesh_with_bcs(problem, "three_span_mesh.svg", all_supports, all_loads);
     SVGGenerator::write_von_mises(problem, "three_span_von_mises.svg");
     SVGGenerator::write_deformed(problem, "three_span_deformed.svg", 500.0);
 
