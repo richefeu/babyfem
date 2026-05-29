@@ -39,7 +39,7 @@ public:
 
     // Multiplication matrice-vecteur: y = A*x
     std::vector<double> multiply(const std::vector<double>& x) const {
-        if (x.size() != cols_) {
+        if (x.size() != static_cast<size_t>(cols_)) {
             throw std::invalid_argument("Vector size mismatch");
         }
         std::vector<double> y(rows_, 0.0);

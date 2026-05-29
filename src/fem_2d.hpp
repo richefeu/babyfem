@@ -126,8 +126,6 @@ public:
     // Matrice de rigidité locale pour élément Q1 bilinéaire
     Matrix local_stiffness_q1() const {
         Matrix k_local(8, 8);
-        double a = dx / 2.0;
-        double b = dy / 2.0;
 
         // Points de Gauss: 2x2
         double gp = 1.0 / std::sqrt(3.0);
@@ -319,7 +317,7 @@ public:
         Vector u_full = GaussSolver::solve(K, F);
 
         // Extraire u et v
-        if (u_full.size() != n_dof) {
+        if (u_full.size() != static_cast<size_t>(n_dof)) {
             throw std::runtime_error("Solver result size mismatch");
         }
 

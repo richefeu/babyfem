@@ -8,7 +8,7 @@ public:
     // Résout K*u = F avec élimination Gauss et pivot partiel
     static Vector solve(Matrix K, Vector F) {
         int n = K.rows();
-        if (K.cols() != n || F.size() != n) {
+        if (K.cols() != n || F.size() != static_cast<size_t>(n)) {
             throw std::invalid_argument("Dimension mismatch");
         }
 
