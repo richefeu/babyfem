@@ -160,12 +160,20 @@ int main() {
     }
 
     Matrix vm = problem.von_mises();
-    double vm_max = 0.0;
+    double vm_max = 0.0, vm_min = 1e308, vm_avg = 0.0;
+    int vm_nonzero = 0;
+
     for (int j = 0; j < ny; ++j) {
         for (int i = 0; i < nx; ++i) {
             vm_max = std::max(vm_max, vm(j, i));
+            vm_min = std::min(vm_min, vm(j, i));
+            if (vm(j, i) > 1e6) {  // Compter les valeurs > 1 MPa
+                vm_avg += vm(j, i);
+                vm_nonzero++;
+            }
         }
     }
+    if (vm_nonzero > 0) vm_avg /= vm_nonzero;
 
     std::cout << "\nDéplacements:\n";
     std::cout << "  Max |u|: " << std::scientific << std::setprecision(3) << u_max << " m\n";
@@ -174,12 +182,31 @@ int main() {
     std::cout << "  Flèche max/L: " << std::fixed << std::setprecision(1)
               << (-v_min / L * 100) << " %\n";
 
-    std::cout << "\nContraintes:\n";
+    std::cout << "\nContraintes - Détail:\n";
     std::cout << "  σxx: [" << std::scientific << std::setprecision(2) << (sxx_min / 1e9)
               << ", " << (sxx_max / 1e9) << "] GPa\n";
     std::cout << "  σyy: [" << (syy_min / 1e9) << ", " << (syy_max / 1e9) << "] GPa\n";
     std::cout << "  σxy max: " << (sxy_max / 1e9) << " GPa\n";
-    std::cout << "  von Mises max: " << (vm_max / 1e9) << " GPa\n";
+
+    std::cout << "\nVon Mises - Distribution:\n";
+    std::cout << "  Min: " << std::scientific << (vm_min / 1e9) << " GPa\n";
+    std::cout << "  Max: " << (vm_max / 1e9) << " GPa\n";
+    std::cout << "  Moy (non-zéro): " << (vm_avg / 1e9) << " GPa\n";
+    std::cout << "  Points > 1 MPa: " << vm_nonzero << " / " << (nx*ny) << "\n";
+
+    // Histogramme simple des contraintes von Mises
+    std::cout << "\nHistogramme von Mises (par décile):\n";
+    for (int decile = 0; decile <= 10; ++decile) {
+        double threshold = vm_min + (vm_max - vm_min) * decile / 10.0;
+        int count = 0;
+        for (int j = 0; j < ny; ++j) {
+            for (int i = 0; i < nx; ++i) {
+                if (vm(j, i) >= threshold) count++;
+            }
+        }
+        std::cout << "  > " << std::fixed << std::setprecision(2) << (threshold / 1e9)
+                  << " GPa: " << count << " nœuds\n";
+    }
 
     // Export SVG
     std::cout << "\nExport SVG...\n";
