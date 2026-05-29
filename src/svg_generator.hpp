@@ -266,7 +266,7 @@ private:
             for (int i = 0; i < fem_.nx - 1; ++i) {
                 double val = 0.25 * (fem_.stress_xx(j, i) + fem_.stress_xx(j+1, i) +
                                      fem_.stress_xx(j+1, i+1) + fem_.stress_xx(j, i+1));
-                std::string color = value_to_color(val, sxx_min, sxx_max);
+                std::string color = value_to_color_linear(val, sxx_min, sxx_max);
 
                 double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
                 double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
@@ -280,7 +280,7 @@ private:
         }
 
         // Colorbar
-        write_colorbar(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), sxx_min, sxx_max);
+        write_colorbar_linear(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), sxx_min, sxx_max);
     }
 
     void draw_stress_yy_impl(std::ofstream& file) {
@@ -299,7 +299,7 @@ private:
             for (int i = 0; i < fem_.nx - 1; ++i) {
                 double val = 0.25 * (fem_.stress_yy(j, i) + fem_.stress_yy(j+1, i) +
                                      fem_.stress_yy(j+1, i+1) + fem_.stress_yy(j, i+1));
-                std::string color = value_to_color(val, syy_min, syy_max);
+                std::string color = value_to_color_linear(val, syy_min, syy_max);
 
                 double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
                 double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
@@ -313,7 +313,7 @@ private:
         }
 
         // Colorbar
-        write_colorbar(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), syy_min, syy_max);
+        write_colorbar_linear(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), syy_min, syy_max);
     }
 
     void draw_stress_xy_impl(std::ofstream& file) {
@@ -332,7 +332,7 @@ private:
             for (int i = 0; i < fem_.nx - 1; ++i) {
                 double val = 0.25 * (fem_.stress_xy(j, i) + fem_.stress_xy(j+1, i) +
                                      fem_.stress_xy(j+1, i+1) + fem_.stress_xy(j, i+1));
-                std::string color = value_to_color(val, sxy_min, sxy_max);
+                std::string color = value_to_color_linear(val, sxy_min, sxy_max);
 
                 double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
                 double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
@@ -346,7 +346,7 @@ private:
         }
 
         // Colorbar
-        write_colorbar(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), sxy_min, sxy_max);
+        write_colorbar_linear(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), sxy_min, sxy_max);
     }
 
     void draw_deformed_impl(std::ofstream& file) {
@@ -466,6 +466,59 @@ private:
         for (int i = 0; i < steps; ++i) {
             double val = vmin + (i / (double)steps) * (vmax - vmin);
             std::string color = value_to_color(val, vmin, vmax);
+            double y_pos = y + i * (h / (double)steps);
+
+            file << "<rect x=\"" << x << "\" y=\"" << y_pos << "\" ";
+            file << "width=\"" << w << "\" height=\"" << (h / steps + 1) << "\" ";
+            file << "fill=\"" << color << "\" stroke=\"none\"/>\n";
+        }
+
+        file << "<text x=\"" << (x + w + 5) << "\" y=\"" << (y + 10) << "\" ";
+        file << "font-size=\"10\" fill=\"black\">";
+        file << std::fixed << std::setprecision(2) << (vmax / 1e9);
+        file << " GPa</text>\n";
+
+        file << "<text x=\"" << (x + w + 5) << "\" y=\"" << (y + h) << "\" ";
+        file << "font-size=\"10\" fill=\"black\">";
+        file << std::fixed << std::setprecision(2) << (vmin / 1e9);
+        file << " GPa</text>\n";
+    }
+
+    static std::string value_to_color_linear(double val, double vmin, double vmax) {
+        double norm = (val - vmin) / (vmax - vmin);
+        norm = std::max(0.0, std::min(1.0, norm));
+
+        int r, g, b;
+        if (norm < 0.25) {
+            r = 0;
+            g = 0;
+            b = 255 * (0.25 + norm) / 0.25;
+        } else if (norm < 0.5) {
+            r = 0;
+            g = 255 * (norm - 0.25) / 0.25;
+            b = 255;
+        } else if (norm < 0.75) {
+            r = 255 * (norm - 0.5) / 0.25;
+            g = 255;
+            b = 255 * (1.0 - (norm - 0.5) / 0.25);
+        } else {
+            r = 255;
+            g = 255 * (1.0 - (norm - 0.75) / 0.25);
+            b = 0;
+        }
+
+        char hex[8];
+        snprintf(hex, sizeof(hex), "#%02x%02x%02x", r, g, b);
+        return std::string(hex);
+    }
+
+    static void write_colorbar_linear(std::ofstream& file, int x, int y, int w, int h,
+                                      double vmin, double vmax) {
+        file << "<!-- Colorbar -->\n";
+        int steps = 20;
+        for (int i = 0; i < steps; ++i) {
+            double val = vmin + (i / (double)steps) * (vmax - vmin);
+            std::string color = value_to_color_linear(val, vmin, vmax);
             double y_pos = y + i * (h / (double)steps);
 
             file << "<rect x=\"" << x << "\" y=\"" << y_pos << "\" ";
