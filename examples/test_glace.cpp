@@ -229,7 +229,7 @@ int main() {
     SVGVisualization(problem)
         .margins(40, 20)  // 40px horizontal, 20px vertical
         .width(600)
-        .deform_scale(100.0)
+        .deform_scale(10.0)
         .mesh()
         .deformed()
         .write("test_glace_deformed.svg");

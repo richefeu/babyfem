@@ -196,6 +196,7 @@ int main() {
         .margin(0.5)
         .width(600)
         .von_mises()
+          .boundary_conditions(all_supports, all_loads)
         .write("three_span_von_mises.svg");
 
     // Deformed geometry with undeformed overlay

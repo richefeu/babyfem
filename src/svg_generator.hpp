@@ -6,629 +6,470 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include <algorithm>
 
-// Modern SVG visualization API
+enum class ColorMap { VIRIDIS, COOLWARM };
+
+// ============================================================
+// SVGVisualization  —  fluent builder API
+// ============================================================
+//
+//   SVGVisualization(problem)
+//     .width(800)
+//     .margins(60, 40)
+//     .von_mises()           // or .stress_xx() / .stress_yy() / .stress_xy()
+//     .mesh_overlay()        // optional: draw element edges on top
+//     .write("out.svg");
+//
+// Colormaps: viridis (default for von Mises), coolwarm (default for
+// signed stress components). Override with .colormap(ColorMap::VIRIDIS).
+// Fix the color scale with .clamp(vmin, vmax).
+// ============================================================
+
 class SVGVisualization {
-private:
-    const ElasticityFEM2D& fem_;
-    double margin_ratio_;
-    double margin_x_px_;
-    double margin_y_px_;
-    bool use_pixel_margins_;
-    double target_size_;
-    double deform_scale_;
-
-    bool show_mesh_;
-    bool show_von_mises_;
-    bool show_stress_xx_;
-    bool show_stress_yy_;
-    bool show_stress_xy_;
-    bool show_deformed_;
-    bool show_bcs_;
-
-    std::vector<int> support_nodes_;
-    std::vector<int> load_nodes_;
-
-    // Computed values
-    double scale_;
-    double margin_x_;
-    double margin_y_;
-    int svg_width_;
-    int svg_height_;
-    double scale_x_;
-    double scale_y_;
-
-    void compute_scales() {
-        double max_dim = std::max(fem_.width, fem_.height);
-        scale_ = target_size_ / max_dim;
-
-        if (use_pixel_margins_) {
-            // Use pixel-based margins
-            margin_x_ = margin_x_px_;
-            margin_y_ = margin_y_px_;
-        } else {
-            // Use ratio-based margins
-            margin_x_ = margin_ratio_ * fem_.width * scale_;
-            margin_y_ = margin_ratio_ * fem_.height * scale_;
-        }
-        scale_x_ = scale_;
-        scale_y_ = scale_;
-    }
-
 public:
-    SVGVisualization(const ElasticityFEM2D& fem)
-        : fem_(fem),
-          margin_ratio_(0.05),
-          margin_x_px_(50),
-          margin_y_px_(50),
-          use_pixel_margins_(false),
-          target_size_(600.0),
-          deform_scale_(100.0),
-          show_mesh_(false),
-          show_von_mises_(false),
-          show_stress_xx_(false),
-          show_stress_yy_(false),
-          show_stress_xy_(false),
-          show_deformed_(false),
-          show_bcs_(false),
-          scale_(0), margin_x_(0), margin_y_(0),
-          svg_width_(0), svg_height_(0), scale_x_(0), scale_y_(0) {
-        compute_scales();
-    }
+    explicit SVGVisualization(const ElasticityFEM2D& fem) : fem_(fem) {}
 
-    // Configuration methods (return *this for chaining)
+    // --- Layout ----------------------------------------------------------
+    SVGVisualization& width(double px)     { target_w_ = px; return *this; }
+
+    SVGVisualization& margins(double x_px, double y_px) {
+        mx_px_ = x_px; my_px_ = y_px; use_ratio_ = false; return *this;
+    }
     SVGVisualization& margin(double ratio) {
-        use_pixel_margins_ = false;
-        margin_ratio_ = ratio;
-        compute_scales();
-        return *this;
+        margin_ratio_ = ratio; use_ratio_ = true; return *this;
     }
 
-    SVGVisualization& margin_x(double pixels) {
-        use_pixel_margins_ = true;
-        margin_x_px_ = pixels;
-        compute_scales();
-        return *this;
+    // --- Color scale -----------------------------------------------------
+    SVGVisualization& colormap(ColorMap cm) { cm_ = cm; cm_set_ = true; return *this; }
+    SVGVisualization& clamp(double lo, double hi) {
+        clamp_lo_ = lo; clamp_hi_ = hi; use_clamp_ = true; return *this;
     }
 
-    SVGVisualization& margin_y(double pixels) {
-        use_pixel_margins_ = true;
-        margin_y_px_ = pixels;
-        compute_scales();
-        return *this;
-    }
-
-    SVGVisualization& margins(double x_pixels, double y_pixels) {
-        use_pixel_margins_ = true;
-        margin_x_px_ = x_pixels;
-        margin_y_px_ = y_pixels;
-        compute_scales();
-        return *this;
-    }
-
-    SVGVisualization& width(double target_px) {
-        target_size_ = target_px;
-        compute_scales();
-        return *this;
-    }
-
-    SVGVisualization& deform_scale(double scale) {
-        deform_scale_ = scale;
-        return *this;
-    }
-
-    // Element selection methods
-    SVGVisualization& mesh() {
-        show_mesh_ = true;
-        return *this;
-    }
-
-    SVGVisualization& von_mises() {
-        show_von_mises_ = true;
-        return *this;
-    }
-
-    SVGVisualization& stress_xx() {
-        show_stress_xx_ = true;
-        return *this;
-    }
-
-    SVGVisualization& stress_yy() {
-        show_stress_yy_ = true;
-        return *this;
-    }
-
-    SVGVisualization& stress_xy() {
-        show_stress_xy_ = true;
-        return *this;
-    }
-
-    SVGVisualization& deformed() {
-        show_deformed_ = true;
-        return *this;
-    }
-
-    SVGVisualization& boundary_conditions(const std::vector<int>& supports,
+    // --- Content ---------------------------------------------------------
+    SVGVisualization& von_mises()    { field_ = Field::VM;  return *this; }
+    SVGVisualization& stress_xx()    { field_ = Field::SXX; return *this; }
+    SVGVisualization& stress_yy()    { field_ = Field::SYY; return *this; }
+    SVGVisualization& stress_xy()    { field_ = Field::SXY; return *this; }
+    SVGVisualization& mesh()         { show_mesh_    = true; return *this; }
+    SVGVisualization& mesh_overlay() { show_overlay_ = true; return *this; }
+    SVGVisualization& deformed()     { show_deformed_ = true; return *this; }
+    SVGVisualization& deform_scale(double s) { deform_scale_ = s; return *this; }
+    SVGVisualization& boundary_conditions(const std::vector<int>& sup,
                                           const std::vector<int>& loads) {
-        support_nodes_ = supports;
-        load_nodes_ = loads;
-        show_bcs_ = true;
-        return *this;
+        sup_ = sup; loads_ = loads; show_bcs_ = true; return *this;
     }
 
-    // Generate and write SVG
+    // --- Write -----------------------------------------------------------
     void write(const std::string& filename) {
-        std::ofstream file(filename);
-        if (!file.is_open()) {
-            throw std::runtime_error("Cannot open file: " + filename);
+        std::ofstream f(filename);
+        if (!f) throw std::runtime_error("Cannot open: " + filename);
+
+        bool has_field = (field_ != Field::NONE);
+        compute_layout(has_field);
+
+        f << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+          << "<svg width=\"" << W_ << "\" height=\"" << H_
+          << "\" xmlns=\"http://www.w3.org/2000/svg\">\n"
+          << "<rect width=\"" << W_ << "\" height=\"" << H_ << "\" fill=\"white\"/>\n";
+
+        if (has_field) {
+            draw_field(f);
+        } else {
+            // Background rect for mesh/deformed views
+            f << "<rect x=\"" << mx_ << "\" y=\"" << (TITLE_H + my_)
+              << "\" width=\""  << (fem_.width  * sx_)
+              << "\" height=\"" << (fem_.height * sy_)
+              << "\" fill=\"#f8f8f8\" stroke=\"#ccc\" stroke-width=\"0.5\"/>\n";
         }
 
-        // Compute final dimensions based on what we're drawing
-        int extra_width = show_von_mises_ ? 100 : 0;
-        svg_width_ = (int)(fem_.width * scale_x_ + 2.0 * margin_x_ + extra_width);
-        svg_height_ = (int)(fem_.height * scale_y_ + 2.0 * margin_y_);
+        if (show_deformed_) draw_deformed(f);
+        else if (show_mesh_) draw_mesh(f);
 
-        // SVG header
-        file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-        file << "<svg width=\"" << svg_width_ << "\" height=\"" << svg_height_ << "\" ";
-        file << "xmlns=\"http://www.w3.org/2000/svg\">\n";
-        file << "<rect width=\"" << svg_width_ << "\" height=\"" << svg_height_
-             << "\" fill=\"white\"/>\n";
+        if (show_bcs_) draw_bcs(f);
 
-        // Draw each requested element
-        if (show_von_mises_) {
-            draw_von_mises_impl(file);
-        } else if (show_stress_xx_) {
-            draw_stress_xx_impl(file);
-        } else if (show_stress_yy_) {
-            draw_stress_yy_impl(file);
-        } else if (show_stress_xy_) {
-            draw_stress_xy_impl(file);
-        } else if (show_mesh_ || show_deformed_ || show_bcs_) {
-            // Background for mesh region
-            file << "<rect x=\"" << margin_x_ << "\" y=\"" << margin_y_ << "\" ";
-            file << "width=\"" << (fem_.width * scale_x_) << "\" height=\"" << (fem_.height * scale_y_) << "\" ";
-            file << "fill=\"#f9f9f9\" stroke=\"#ccc\" stroke-width=\"1\"/>\n";
-        }
+        write_title(f);
+        write_dim_label(f);
 
-        if (show_deformed_) {
-            draw_deformed_impl(file);
-        } else if (show_mesh_) {
-            draw_mesh_impl(file);
-        }
-
-        if (show_bcs_) {
-            draw_bcs_impl(file);
-        }
-
-        // Dimensions label
-        file << "<!-- Dimensions -->\n";
-        file << "<g font-family=\"monospace\" font-size=\"10\" fill=\"#666\">\n";
-        file << "<text x=\"" << (margin_x_ + fem_.width * scale_x_ / 2 - 20) << "\" y=\""
-             << (svg_height_ - margin_y_ + 35) << "\">";
-        file << "L = " << std::fixed << std::setprecision(2) << fem_.width << " m</text>\n";
-        file << "</g>\n";
-
-        file << "</svg>\n";
-        file.close();
-
+        f << "</svg>\n";
         std::cout << "Written: " << filename << "\n";
     }
 
 private:
-    // Implementation methods for drawing each element
-    void draw_mesh_impl(std::ofstream& file) {
-        file << "<!-- Mesh elements -->\n";
-        file << "<g stroke=\"#ddd\" stroke-width=\"0.5\" fill=\"none\">\n";
-        for (int j = 0; j < fem_.ny - 1; ++j) {
-            for (int i = 0; i < fem_.nx - 1; ++i) {
-                double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
-                double w = (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double h = (fem_.height / (fem_.ny - 1)) * scale_y_;
+    // -----------------------------------------------------------------
+    enum class Field { NONE, VM, SXX, SYY, SXY };
 
-                file << "<rect x=\"" << x1 << "\" y=\"" << y1 << "\" ";
-                file << "width=\"" << w << "\" height=\"" << h << "\"/>\n";
-            }
-        }
-        file << "</g>\n";
+    const ElasticityFEM2D& fem_;
 
-        // Mesh nodes
-        file << "<!-- Mesh nodes -->\n";
-        file << "<g fill=\"#999\" stroke=\"none\">\n";
-        for (int j = 0; j < fem_.ny; ++j) {
-            for (int i = 0; i < fem_.nx; ++i) {
-                double x = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double y = margin_y_ + (fem_.height - j * (fem_.height / (fem_.ny - 1))) * scale_y_;
-                file << "<circle cx=\"" << x << "\" cy=\"" << y << "\" r=\"1\"/>\n";
-            }
+    // Layout options
+    double target_w_     = 600;
+    double mx_px_        = 50,  my_px_       = 50;
+    double margin_ratio_ = 0.05;
+    bool   use_ratio_    = false;
+    double deform_scale_ = 100;
+
+    // Color options
+    bool     cm_set_    = false;
+    ColorMap cm_        = ColorMap::VIRIDIS;
+    double   clamp_lo_  = 0, clamp_hi_ = 0;
+    bool     use_clamp_ = false;
+
+    // Content flags
+    Field field_        = Field::NONE;
+    bool  show_mesh_    = false;
+    bool  show_overlay_ = false;
+    bool  show_deformed_= false;
+    bool  show_bcs_     = false;
+    std::vector<int> sup_, loads_;
+
+    // Computed layout (set by compute_layout)
+    double mx_ = 0, my_ = 0, sx_ = 0, sy_ = 0;
+    int    W_  = 0, H_  = 0;
+
+    static constexpr int CB_W     = 18;  // colorbar width (px)
+    static constexpr int CB_GAP   = 14;  // gap between plot and colorbar
+    static constexpr int CB_TEXT  = 70;  // space for tick labels
+    static constexpr int TITLE_H  = 30;  // space reserved above plot for title
+    static constexpr int DIM_H    = 22;  // space below plot for dimension label
+
+    // -----------------------------------------------------------------
+    void compute_layout(bool colorbar) {
+        sx_ = sy_ = target_w_ / std::max(fem_.width, fem_.height);
+
+        if (use_ratio_) {
+            mx_ = margin_ratio_ * fem_.width  * sx_;
+            my_ = margin_ratio_ * fem_.height * sy_;
+        } else {
+            mx_ = mx_px_;
+            my_ = my_px_;
         }
-        file << "</g>\n";
+
+        int extra = colorbar ? (CB_GAP + CB_W + CB_GAP + CB_TEXT) : 0;
+        W_ = (int)(2 * mx_ + fem_.width  * sx_ + extra);
+        H_ = (int)(TITLE_H  + 2 * my_ + fem_.height * sy_ + DIM_H);
     }
 
-    void draw_von_mises_impl(std::ofstream& file) {
-        Matrix vm = fem_.von_mises();
+    // Node pixel coordinates (i=col, j=row in FEM grid)
+    double px(int i) const { return mx_ + i * fem_.dx * sx_; }
+    double py(int j) const { return TITLE_H + my_ + (fem_.height - j * fem_.dy) * sy_; }
 
-        // Find min/max for non-zero values only
-        double vm_min = 1e308, vm_max = -1e308;
-        for (int j = 0; j < fem_.ny; ++j) {
-            for (int i = 0; i < fem_.nx; ++i) {
-                double val = vm(j, i);
-                if (val > 1e6) {
-                    vm_min = std::min(vm_min, val);
-                    vm_max = std::max(vm_max, val);
-                }
-            }
-        }
+    // Element pixel dimensions
+    double ew() const { return fem_.dx * sx_; }
+    double eh() const { return fem_.dy * sy_; }
 
-        if (vm_min > vm_max) {
-            vm_min = 1e6;
-            vm_max = 1e10;
-        }
+    // =================================================================
+    // Colormap
+    // =================================================================
+    struct RGB { int r, g, b; };
 
-        // Draw colored elements
-        for (int j = 0; j < fem_.ny - 1; ++j) {
-            for (int i = 0; i < fem_.nx - 1; ++i) {
-                double val = 0.25 * (vm(j, i) + vm(j+1, i) + vm(j+1, i+1) + vm(j, i+1));
-                std::string color = value_to_color(val, vm_min, vm_max);
-
-                double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
-                double w = (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double h = (fem_.height / (fem_.ny - 1)) * scale_y_;
-
-                file << "<rect x=\"" << x1 << "\" y=\"" << y1 << "\" ";
-                file << "width=\"" << w << "\" height=\"" << h << "\" ";
-                file << "fill=\"" << color << "\" stroke=\"none\"/>\n";
-            }
-        }
-
-        // Colorbar
-        write_colorbar(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), vm_min, vm_max);
+    static RGB color_rgb(double t, ColorMap cm) {
+        t = std::max(0.0, std::min(1.0, t));
+        struct CP { double t; int r, g, b; };
+        // Viridis: dark purple → blue → teal → green → yellow
+        static const CP V[5] = {
+            {0.00,  68,   1,  84}, {0.25,  59,  82, 139},
+            {0.50,  33, 145, 140}, {0.75,  94, 201,  98}, {1.00, 253, 231,  37}};
+        // Coolwarm: blue → white → red  (symmetric around 0)
+        static const CP C[5] = {
+            {0.00,  59,  76, 192}, {0.25, 144, 178, 254},
+            {0.50, 220, 220, 220}, {0.75, 245, 156, 125}, {1.00, 180,   4,  38}};
+        const CP* p = (cm == ColorMap::VIRIDIS) ? V : C;
+        int s = 3;
+        for (int i = 0; i < 4; ++i) if (t <= p[i+1].t) { s = i; break; }
+        double u = (p[s+1].t > p[s].t) ? (t - p[s].t) / (p[s+1].t - p[s].t) : 0.0;
+        return { (int)(p[s].r + u*(p[s+1].r - p[s].r)),
+                 (int)(p[s].g + u*(p[s+1].g - p[s].g)),
+                 (int)(p[s].b + u*(p[s+1].b - p[s].b)) };
     }
 
-    void draw_stress_xx_impl(std::ofstream& file) {
-        // Find min/max values
-        double sxx_min = 1e308, sxx_max = -1e308;
-        for (int j = 0; j < fem_.ny; ++j) {
-            for (int i = 0; i < fem_.nx; ++i) {
-                double val = fem_.stress_xx(j, i);
-                sxx_min = std::min(sxx_min, val);
-                sxx_max = std::max(sxx_max, val);
-            }
-        }
-
-        // Draw colored elements
-        for (int j = 0; j < fem_.ny - 1; ++j) {
-            for (int i = 0; i < fem_.nx - 1; ++i) {
-                double val = 0.25 * (fem_.stress_xx(j, i) + fem_.stress_xx(j+1, i) +
-                                     fem_.stress_xx(j+1, i+1) + fem_.stress_xx(j, i+1));
-                std::string color = value_to_color_linear(val, sxx_min, sxx_max);
-
-                double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
-                double w = (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double h = (fem_.height / (fem_.ny - 1)) * scale_y_;
-
-                file << "<rect x=\"" << x1 << "\" y=\"" << y1 << "\" ";
-                file << "width=\"" << w << "\" height=\"" << h << "\" ";
-                file << "fill=\"" << color << "\" stroke=\"none\"/>\n";
-            }
-        }
-
-        // Colorbar
-        write_colorbar_linear(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), sxx_min, sxx_max);
+    static std::string to_hex(RGB c) {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "#%02x%02x%02x", c.r, c.g, c.b);
+        return buf;
     }
 
-    void draw_stress_yy_impl(std::ofstream& file) {
-        // Find min/max values
-        double syy_min = 1e308, syy_max = -1e308;
-        for (int j = 0; j < fem_.ny; ++j) {
-            for (int i = 0; i < fem_.nx; ++i) {
-                double val = fem_.stress_yy(j, i);
-                syy_min = std::min(syy_min, val);
-                syy_max = std::max(syy_max, val);
-            }
-        }
-
-        // Draw colored elements
-        for (int j = 0; j < fem_.ny - 1; ++j) {
-            for (int i = 0; i < fem_.nx - 1; ++i) {
-                double val = 0.25 * (fem_.stress_yy(j, i) + fem_.stress_yy(j+1, i) +
-                                     fem_.stress_yy(j+1, i+1) + fem_.stress_yy(j, i+1));
-                std::string color = value_to_color_linear(val, syy_min, syy_max);
-
-                double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
-                double w = (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double h = (fem_.height / (fem_.ny - 1)) * scale_y_;
-
-                file << "<rect x=\"" << x1 << "\" y=\"" << y1 << "\" ";
-                file << "width=\"" << w << "\" height=\"" << h << "\" ";
-                file << "fill=\"" << color << "\" stroke=\"none\"/>\n";
-            }
-        }
-
-        // Colorbar
-        write_colorbar_linear(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), syy_min, syy_max);
+    static std::string val_hex(double v, double vmin, double vmax, ColorMap cm) {
+        double t = (vmax > vmin) ? (v - vmin) / (vmax - vmin) : 0.5;
+        return to_hex(color_rgb(t, cm));
     }
 
-    void draw_stress_xy_impl(std::ofstream& file) {
-        // Find min/max values
-        double sxy_min = 1e308, sxy_max = -1e308;
-        for (int j = 0; j < fem_.ny; ++j) {
-            for (int i = 0; i < fem_.nx; ++i) {
-                double val = fem_.stress_xy(j, i);
-                sxy_min = std::min(sxy_min, val);
-                sxy_max = std::max(sxy_max, val);
-            }
-        }
-
-        // Draw colored elements
-        for (int j = 0; j < fem_.ny - 1; ++j) {
-            for (int i = 0; i < fem_.nx - 1; ++i) {
-                double val = 0.25 * (fem_.stress_xy(j, i) + fem_.stress_xy(j+1, i) +
-                                     fem_.stress_xy(j+1, i+1) + fem_.stress_xy(j, i+1));
-                std::string color = value_to_color_linear(val, sxy_min, sxy_max);
-
-                double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
-                double w = (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double h = (fem_.height / (fem_.ny - 1)) * scale_y_;
-
-                file << "<rect x=\"" << x1 << "\" y=\"" << y1 << "\" ";
-                file << "width=\"" << w << "\" height=\"" << h << "\" ";
-                file << "fill=\"" << color << "\" stroke=\"none\"/>\n";
-            }
-        }
-
-        // Colorbar
-        write_colorbar_linear(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), sxy_min, sxy_max);
+    // Auto-select SI unit prefix from the largest absolute value
+    static std::pair<double, std::string> auto_unit(double absmax) {
+        if (absmax >= 0.9e9) return {1e9, "GPa"};
+        if (absmax >= 0.9e6) return {1e6, "MPa"};
+        if (absmax >= 0.9e3) return {1e3, "kPa"};
+        return {1.0, "Pa"};
     }
 
-    void draw_deformed_impl(std::ofstream& file) {
-        // Undeformed geometry (light gray)
-        file << "<g stroke=\"lightgray\" fill=\"none\" stroke-width=\"1\">\n";
+    // =================================================================
+    // Title  and dimension label
+    // =================================================================
+    void write_title(std::ofstream& f) const {
+        std::string text;
+        if      (field_ == Field::VM)  text = "von Mises";
+        else if (field_ == Field::SXX) text = "σxx";
+        else if (field_ == Field::SYY) text = "σyy";
+        else if (field_ == Field::SXY) text = "σxy";
+        else if (show_deformed_)       text = "Déformée";
+        else                           text = "Maillage";
+
+        double cx = mx_ + fem_.width * sx_ * 0.5;
+        f << "<text x=\"" << cx << "\" y=\"" << (TITLE_H - 8)
+          << "\" font-family=\"sans-serif\" font-size=\"14\" font-weight=\"bold\""
+          << " text-anchor=\"middle\" fill=\"#222\">" << text << "</text>\n";
+    }
+
+    void write_dim_label(std::ofstream& f) const {
+        double cx = mx_ + fem_.width * sx_ * 0.5;
+        double y  = TITLE_H + my_ + fem_.height * sy_ + 14;
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(4)
+            << "L = " << fem_.width << " m  ×  H = " << fem_.height << " m";
+        f << "<text x=\"" << cx << "\" y=\"" << y
+          << "\" font-family=\"sans-serif\" font-size=\"10\""
+          << " text-anchor=\"middle\" fill=\"#999\">" << oss.str() << "</text>\n";
+    }
+
+    // =================================================================
+    // Colorbar  (vertical, top = vmax, bottom = vmin)
+    // =================================================================
+    void write_colorbar(std::ofstream& f,
+                        double vmin, double vmax,
+                        ColorMap cm,
+                        const std::string& label) const {
+        double cb_x = mx_ + fem_.width * sx_ + CB_GAP;
+        double cb_y = TITLE_H + my_;
+        double cb_h = fem_.height * sy_;
+
+        auto [us, un] = auto_unit(std::max(std::abs(vmin), std::abs(vmax)));
+
+        // Continuous gradient: 200 thin rects
+        constexpr int STEPS = 200;
+        for (int k = 0; k < STEPS; ++k) {
+            double t  = (double)k / STEPS;
+            double v  = vmax - t * (vmax - vmin);   // top→bottom : vmax→vmin
+            double ry = cb_y + t * cb_h;
+            double rh = cb_h / STEPS + 1.0;         // +1 avoids hairline gaps
+            f << "<rect x=\"" << cb_x << "\" y=\"" << ry
+              << "\" width=\"" << CB_W << "\" height=\"" << rh
+              << "\" fill=\"" << val_hex(v, vmin, vmax, cm) << "\" stroke=\"none\"/>\n";
+        }
+
+        // Thin border around the colorbar
+        f << "<rect x=\"" << cb_x << "\" y=\"" << cb_y
+          << "\" width=\"" << CB_W << "\" height=\"" << cb_h
+          << "\" fill=\"none\" stroke=\"#777\" stroke-width=\"0.5\"/>\n";
+
+        // Field label  (e.g. "σ_M")  and unit above the colorbar
+        f << "<text x=\"" << cb_x << "\" y=\"" << (cb_y - 16)
+          << "\" font-family=\"sans-serif\" font-size=\"12\" font-weight=\"bold\" fill=\"#222\">"
+          << label << "</text>\n";
+        f << "<text x=\"" << cb_x << "\" y=\"" << (cb_y - 4)
+          << "\" font-family=\"sans-serif\" font-size=\"10\" fill=\"#555\">"
+          << "[" << un << "]</text>\n";
+
+        // 6 ticks  (k = 0 … 5,  top to bottom)
+        for (int k = 0; k <= 5; ++k) {
+            double t  = (double)k / 5;
+            double v  = vmax - t * (vmax - vmin);
+            double ty = cb_y + t * cb_h;
+
+            // Tick mark on left edge of colorbar
+            f << "<line x1=\"" << cb_x << "\" y1=\"" << ty
+              << "\" x2=\"" << (cb_x - 4) << "\" y2=\"" << ty
+              << "\" stroke=\"#444\" stroke-width=\"0.8\"/>\n";
+
+            // Numeric label to the right of the colorbar
+            std::ostringstream oss;
+            double vs = v / us;
+            oss << std::fixed << std::setprecision(std::abs(vs) < 100 ? 2 : 1) << vs;
+            f << "<text x=\"" << (cb_x + CB_W + 5) << "\" y=\"" << (ty + 4)
+              << "\" font-family=\"sans-serif\" font-size=\"10\" fill=\"#333\">"
+              << oss.str() << "</text>\n";
+        }
+    }
+
+    // =================================================================
+    // Field map  (generic for all stress quantities)
+    // =================================================================
+    void draw_field(std::ofstream& f) {
+        // Collect node values into a flat array
+        std::vector<double> data(fem_.nx * fem_.ny);
+        std::string label;
+        ColorMap cm;
+
+        switch (field_) {
+            case Field::VM: {
+                Matrix vm = fem_.von_mises();
+                for (int j = 0; j < fem_.ny; ++j)
+                    for (int i = 0; i < fem_.nx; ++i)
+                        data[j*fem_.nx + i] = vm(j, i);
+                label = "σ_M";   // σ_M
+                cm    = cm_set_ ? cm_ : ColorMap::VIRIDIS;
+                break;
+            }
+            case Field::SXX:
+                for (int j = 0; j < fem_.ny; ++j)
+                    for (int i = 0; i < fem_.nx; ++i)
+                        data[j*fem_.nx + i] = fem_.stress_xx(j, i);
+                label = "σ_xx";
+                cm    = cm_set_ ? cm_ : ColorMap::COOLWARM;
+                break;
+            case Field::SYY:
+                for (int j = 0; j < fem_.ny; ++j)
+                    for (int i = 0; i < fem_.nx; ++i)
+                        data[j*fem_.nx + i] = fem_.stress_yy(j, i);
+                label = "σ_yy";
+                cm    = cm_set_ ? cm_ : ColorMap::COOLWARM;
+                break;
+            case Field::SXY:
+                for (int j = 0; j < fem_.ny; ++j)
+                    for (int i = 0; i < fem_.nx; ++i)
+                        data[j*fem_.nx + i] = fem_.stress_xy(j, i);
+                label = "σ_xy";
+                cm    = cm_set_ ? cm_ : ColorMap::COOLWARM;
+                break;
+            default: return;
+        }
+
+        // Color range
+        double vmin, vmax;
+        if (use_clamp_) {
+            vmin = clamp_lo_; vmax = clamp_hi_;
+        } else {
+            vmin = *std::min_element(data.begin(), data.end());
+            vmax = *std::max_element(data.begin(), data.end());
+            if (vmin >= vmax) vmax = vmin + 1.0;
+        }
+
+        // Colored quads (average of 4 corner values per element)
+        double pw = ew(), ph = eh();
         for (int j = 0; j < fem_.ny - 1; ++j) {
             for (int i = 0; i < fem_.nx - 1; ++i) {
-                double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
-                double w = (fem_.width / (fem_.nx - 1)) * scale_x_;
-                double h = (fem_.height / (fem_.ny - 1)) * scale_y_;
-
-                file << "<rect x=\"" << x1 << "\" y=\"" << y1 << "\" ";
-                file << "width=\"" << w << "\" height=\"" << h << "\"/>\n";
+                double v = 0.25 * (data[ j   *fem_.nx + i  ] + data[(j+1)*fem_.nx + i  ] +
+                                   data[(j+1)*fem_.nx + i+1] + data[ j   *fem_.nx + i+1]);
+                f << "<rect x=\"" << px(i) << "\" y=\"" << py(j+1)
+                  << "\" width=\""  << pw << "\" height=\"" << ph
+                  << "\" fill=\""   << val_hex(v, vmin, vmax, cm)
+                  << "\" stroke=\"none\"/>\n";
             }
         }
-        file << "</g>\n";
 
-        // Deformed geometry (blue)
-        file << "<g stroke=\"blue\" fill=\"none\" stroke-width=\"2\">\n";
+        if (show_overlay_) draw_mesh_overlay(f);
+
+        write_colorbar(f, vmin, vmax, cm, label);
+    }
+
+    // =================================================================
+    // Mesh
+    // =================================================================
+    void draw_mesh_overlay(std::ofstream& f) const {
+        f << "<g stroke=\"rgba(0,0,0,0.18)\" stroke-width=\"0.3\" fill=\"none\">\n";
+        for (int j = 0; j < fem_.ny - 1; ++j)
+            for (int i = 0; i < fem_.nx - 1; ++i)
+                f << "<rect x=\"" << px(i) << "\" y=\"" << py(j+1)
+                  << "\" width=\"" << ew() << "\" height=\"" << eh() << "\"/>\n";
+        f << "</g>\n";
+    }
+
+    void draw_mesh(std::ofstream& f) const {
+        f << "<g stroke=\"#aaa\" stroke-width=\"0.5\" fill=\"none\">\n";
+        for (int j = 0; j < fem_.ny - 1; ++j)
+            for (int i = 0; i < fem_.nx - 1; ++i)
+                f << "<rect x=\"" << px(i) << "\" y=\"" << py(j+1)
+                  << "\" width=\"" << ew() << "\" height=\"" << eh() << "\"/>\n";
+        f << "</g>\n";
+        f << "<g fill=\"#888\">\n";
+        for (int j = 0; j < fem_.ny; ++j)
+            for (int i = 0; i < fem_.nx; ++i)
+                f << "<circle cx=\"" << px(i) << "\" cy=\"" << py(j) << "\" r=\"1\"/>\n";
+        f << "</g>\n";
+    }
+
+    // =================================================================
+    // Deformed shape
+    // =================================================================
+    void draw_deformed(std::ofstream& f) const {
+        // Undeformed reference (light gray)
+        f << "<g stroke=\"#ddd\" fill=\"none\" stroke-width=\"0.5\">\n";
+        for (int j = 0; j < fem_.ny - 1; ++j)
+            for (int i = 0; i < fem_.nx - 1; ++i)
+                f << "<rect x=\"" << px(i) << "\" y=\"" << py(j+1)
+                  << "\" width=\"" << ew() << "\" height=\"" << eh() << "\"/>\n";
+        f << "</g>\n";
+
+        // Deformed mesh (blue)
+        f << "<g stroke=\"#0055cc\" fill=\"none\" stroke-width=\"1.5\">\n";
         for (int j = 0; j < fem_.ny - 1; ++j) {
             for (int i = 0; i < fem_.nx - 1; ++i) {
-                double xi[] = {(double)i, (double)(i+1), (double)(i+1), (double)i, (double)i};
-                double yi[] = {(double)j, (double)j, (double)(j+1), (double)(j+1), (double)j};
-
-                file << "<polyline points=\"";
+                // Loop over 4 corners + closing vertex
+                const int ci[5] = {i,   i+1, i+1, i,   i  };
+                const int cj[5] = {j,   j,   j+1, j+1, j  };
+                f << "<polyline points=\"";
                 for (int k = 0; k < 5; ++k) {
-                    double x = margin_x_ + (xi[k] * (fem_.width / (fem_.nx - 1)) +
-                               fem_.u[fem_.node_idx((int)xi[k], (int)yi[k])] * deform_scale_) * scale_x_;
-                    double y = margin_y_ + (fem_.height - (yi[k] * (fem_.height / (fem_.ny - 1)) +
-                               fem_.v[fem_.node_idx((int)xi[k], (int)yi[k])] * deform_scale_)) * scale_y_;
-                    file << x << "," << y;
-                    if (k < 4) file << " ";
+                    int idx = fem_.node_idx(ci[k], cj[k]);
+                    double x = mx_ + (ci[k] * fem_.dx + fem_.u[idx] * deform_scale_) * sx_;
+                    double y = TITLE_H + my_
+                             + (fem_.height - (cj[k] * fem_.dy + fem_.v[idx] * deform_scale_)) * sy_;
+                    f << x << "," << y << (k < 4 ? " " : "");
                 }
-                file << "\"/>\n";
+                f << "\"/>\n";
             }
         }
-        file << "</g>\n";
+        f << "</g>\n";
     }
 
-    void draw_bcs_impl(std::ofstream& file) {
-        // Supports (blue triangles)
-        file << "<!-- Supports (v=0) -->\n";
-        file << "<g fill=\"#0066cc\" stroke=\"#003366\" stroke-width=\"1\">\n";
-        for (int node_idx : support_nodes_) {
-            int i = node_idx % fem_.nx;
-            int j = node_idx / fem_.nx;
-            double x = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
-            double y = margin_y_ + (fem_.height - j * (fem_.height / (fem_.ny - 1))) * scale_y_;
-            double size = 8.0;
-
-            file << "<polygon points=\"" << x << "," << (y - size) << " ";
-            file << (x - size) << "," << (y + size) << " ";
-            file << (x + size) << "," << (y + size) << "\"/>\n";
+    // =================================================================
+    // Boundary conditions  (supports = blue triangle, loads = red arrow)
+    // =================================================================
+    void draw_bcs(std::ofstream& f) const {
+        f << "<g fill=\"#0055cc\" stroke=\"#003388\" stroke-width=\"0.8\">\n";
+        for (int n : sup_) {
+            double x = px(n % fem_.nx), y = py(n / fem_.nx);
+            double s = 7.0;
+            f << "<polygon points=\"" << x << "," << y
+              << " " << (x - s) << "," << (y + s)
+              << " " << (x + s) << "," << (y + s) << "\"/>\n";
         }
-        file << "</g>\n";
+        f << "</g>\n";
 
-        // Loads (red arrows)
-        file << "<!-- Loads (applied displacement) -->\n";
-        file << "<g stroke=\"#cc0000\" stroke-width=\"2\" fill=\"none\">\n";
-        for (int node_idx : load_nodes_) {
-            int i = node_idx % fem_.nx;
-            int j = node_idx / fem_.nx;
-            double x = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
-            double y = margin_y_ + (fem_.height - j * (fem_.height / (fem_.ny - 1))) * scale_y_;
-            double arrow_len = 15.0;
-            double arrow_head = 4.0;
-
-            file << "<line x1=\"" << x << "\" y1=\"" << (y - arrow_len) << "\" ";
-            file << "x2=\"" << x << "\" y2=\"" << (y + arrow_len) << "\"/>\n";
-
-            file << "<polygon points=\"" << x << "," << (y + arrow_len) << " ";
-            file << (x - arrow_head) << "," << (y + arrow_len - arrow_head) << " ";
-            file << (x + arrow_head) << "," << (y + arrow_len - arrow_head) << "\" ";
-            file << "fill=\"#cc0000\"/>\n";
+        f << "<g stroke=\"#cc0000\" stroke-width=\"1.5\" fill=\"#cc0000\">\n";
+        for (int n : loads_) {
+            double x = px(n % fem_.nx), y = py(n / fem_.nx);
+            constexpr double len = 14.0, head = 4.0;
+            f << "<line x1=\""    << x        << "\" y1=\"" << (y - len)
+              << "\" x2=\""       << x        << "\" y2=\"" << y << "\"/>\n";
+            f << "<polygon points=\"" << x    << "," << y
+              << " " << (x - head)    << "," << (y - head)
+              << " " << (x + head)    << "," << (y - head) << "\"/>\n";
         }
-        file << "</g>\n";
-    }
-
-    static std::string value_to_color(double val, double vmin, double vmax) {
-        double offset = vmax * 1e-4;
-        double log_val = std::log10(val + offset);
-        double log_vmin = std::log10(vmin + offset);
-        double log_vmax = std::log10(vmax + offset);
-
-        double norm = (log_val - log_vmin) / (log_vmax - log_vmin);
-        norm = std::max(0.0, std::min(1.0, norm));
-
-        int r, g, b;
-        if (norm < 0.25) {
-            r = 0;
-            g = 0;
-            b = 255 * (0.25 + norm) / 0.25;
-        } else if (norm < 0.5) {
-            r = 0;
-            g = 255 * (norm - 0.25) / 0.25;
-            b = 255;
-        } else if (norm < 0.75) {
-            r = 255 * (norm - 0.5) / 0.25;
-            g = 255;
-            b = 255 * (1.0 - (norm - 0.5) / 0.25);
-        } else {
-            r = 255;
-            g = 255 * (1.0 - (norm - 0.75) / 0.25);
-            b = 0;
-        }
-
-        char hex[8];
-        snprintf(hex, sizeof(hex), "#%02x%02x%02x", r, g, b);
-        return std::string(hex);
-    }
-
-    static void write_colorbar(std::ofstream& file, int x, int y, int w, int h,
-                               double vmin, double vmax) {
-        file << "<!-- Colorbar -->\n";
-        int steps = 20;
-        for (int i = 0; i < steps; ++i) {
-            double val = vmin + (i / (double)steps) * (vmax - vmin);
-            std::string color = value_to_color(val, vmin, vmax);
-            double y_pos = y + i * (h / (double)steps);
-
-            file << "<rect x=\"" << x << "\" y=\"" << y_pos << "\" ";
-            file << "width=\"" << w << "\" height=\"" << (h / steps + 1) << "\" ";
-            file << "fill=\"" << color << "\" stroke=\"none\"/>\n";
-        }
-
-        file << "<text x=\"" << (x + w + 5) << "\" y=\"" << (y + 10) << "\" ";
-        file << "font-size=\"10\" fill=\"black\">";
-        file << std::fixed << std::setprecision(2) << (vmax / 1e9);
-        file << " GPa</text>\n";
-
-        file << "<text x=\"" << (x + w + 5) << "\" y=\"" << (y + h) << "\" ";
-        file << "font-size=\"10\" fill=\"black\">";
-        file << std::fixed << std::setprecision(2) << (vmin / 1e9);
-        file << " GPa</text>\n";
-    }
-
-    static std::string value_to_color_linear(double val, double vmin, double vmax) {
-        double norm = (val - vmin) / (vmax - vmin);
-        norm = std::max(0.0, std::min(1.0, norm));
-
-        int r, g, b;
-        if (norm < 0.25) {
-            r = 0;
-            g = 0;
-            b = 255 * (0.25 + norm) / 0.25;
-        } else if (norm < 0.5) {
-            r = 0;
-            g = 255 * (norm - 0.25) / 0.25;
-            b = 255;
-        } else if (norm < 0.75) {
-            r = 255 * (norm - 0.5) / 0.25;
-            g = 255;
-            b = 255 * (1.0 - (norm - 0.5) / 0.25);
-        } else {
-            r = 255;
-            g = 255 * (1.0 - (norm - 0.75) / 0.25);
-            b = 0;
-        }
-
-        char hex[8];
-        snprintf(hex, sizeof(hex), "#%02x%02x%02x", r, g, b);
-        return std::string(hex);
-    }
-
-    static void write_colorbar_linear(std::ofstream& file, int x, int y, int w, int h,
-                                      double vmin, double vmax) {
-        file << "<!-- Colorbar -->\n";
-        int steps = 20;
-        for (int i = 0; i < steps; ++i) {
-            double val = vmin + (i / (double)steps) * (vmax - vmin);
-            std::string color = value_to_color_linear(val, vmin, vmax);
-            double y_pos = y + i * (h / (double)steps);
-
-            file << "<rect x=\"" << x << "\" y=\"" << y_pos << "\" ";
-            file << "width=\"" << w << "\" height=\"" << (h / steps + 1) << "\" ";
-            file << "fill=\"" << color << "\" stroke=\"none\"/>\n";
-        }
-
-        file << "<text x=\"" << (x + w + 5) << "\" y=\"" << (y + 10) << "\" ";
-        file << "font-size=\"10\" fill=\"black\">";
-        file << std::fixed << std::setprecision(2) << (vmax / 1e9);
-        file << " GPa</text>\n";
-
-        file << "<text x=\"" << (x + w + 5) << "\" y=\"" << (y + h) << "\" ";
-        file << "font-size=\"10\" fill=\"black\">";
-        file << std::fixed << std::setprecision(2) << (vmin / 1e9);
-        file << " GPa</text>\n";
+        f << "</g>\n";
     }
 };
 
-// Legacy API (kept for compatibility, uses SVGVisualization internally)
+// ============================================================
+// SVGGenerator  —  legacy one-liner helpers
+// ============================================================
 class SVGGenerator {
 public:
-    static void write_mesh_with_bcs(const ElasticityFEM2D& fem, const std::string& filename,
-                                    const std::vector<int>& support_nodes,
-                                    const std::vector<int>& load_nodes) {
-        SVGVisualization(fem)
-            .margin(0.1)
-            .width(600)
-            .mesh()
-            .boundary_conditions(support_nodes, load_nodes)
-            .write(filename);
+    static void write_von_mises(const ElasticityFEM2D& fem, const std::string& f) {
+        SVGVisualization(fem).margins(50, 50).width(600).von_mises().write(f);
     }
-    static void write_von_mises(const ElasticityFEM2D& fem, const std::string& filename) {
-        SVGVisualization(fem)
-            .margin(0.05)
-            .width(600)
-            .von_mises()
-            .write(filename);
+    static void write_stress_xx(const ElasticityFEM2D& fem, const std::string& f) {
+        SVGVisualization(fem).margins(50, 50).width(600).stress_xx().write(f);
     }
-
-    static void write_stress_xx(const ElasticityFEM2D& fem, const std::string& filename) {
-        SVGVisualization(fem)
-            .margin(0.05)
-            .width(600)
-            .stress_xx()
-            .write(filename);
+    static void write_stress_yy(const ElasticityFEM2D& fem, const std::string& f) {
+        SVGVisualization(fem).margins(50, 50).width(600).stress_yy().write(f);
     }
-
-    static void write_stress_yy(const ElasticityFEM2D& fem, const std::string& filename) {
-        SVGVisualization(fem)
-            .margin(0.05)
-            .width(600)
-            .stress_yy()
-            .write(filename);
+    static void write_stress_xy(const ElasticityFEM2D& fem, const std::string& f) {
+        SVGVisualization(fem).margins(50, 50).width(600).stress_xy().write(f);
     }
-
-    static void write_stress_xy(const ElasticityFEM2D& fem, const std::string& filename) {
-        SVGVisualization(fem)
-            .margin(0.05)
-            .width(600)
-            .stress_xy()
-            .write(filename);
+    static void write_mesh_with_bcs(const ElasticityFEM2D& fem, const std::string& f,
+                                    const std::vector<int>& s, const std::vector<int>& l) {
+        SVGVisualization(fem).margins(50, 50).width(600).mesh().boundary_conditions(s, l).write(f);
     }
-
-public:
-    static void write_deformed(const ElasticityFEM2D& fem, const std::string& filename,
-                               double deform_scale = 100.0) {
-        SVGVisualization(fem)
-            .margin(0.05)
-            .width(600)
-            .deform_scale(deform_scale)
-            .mesh()
-            .deformed()
-            .write(filename);
+    static void write_deformed(const ElasticityFEM2D& fem, const std::string& f,
+                               double ds = 100.0) {
+        SVGVisualization(fem).margins(50, 50).width(600).deform_scale(ds).mesh().deformed().write(f);
     }
 };
