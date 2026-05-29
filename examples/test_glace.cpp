@@ -201,6 +201,25 @@ int main() {
         .von_mises()
         .write("test_glace_von_mises.svg");
 
+    // Individual stress components
+    SVGVisualization(problem)
+        .margin(0.05)
+        .width(600)
+        .stress_xx()
+        .write("test_glace_stress_xx.svg");
+
+    SVGVisualization(problem)
+        .margin(0.05)
+        .width(600)
+        .stress_yy()
+        .write("test_glace_stress_yy.svg");
+
+    SVGVisualization(problem)
+        .margin(0.05)
+        .width(600)
+        .stress_xy()
+        .write("test_glace_stress_xy.svg");
+
     // Deformed geometry with undeformed overlay
     SVGVisualization(problem)
         .margin(0.05)

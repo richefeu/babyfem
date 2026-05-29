@@ -17,6 +17,9 @@ private:
 
     bool show_mesh_;
     bool show_von_mises_;
+    bool show_stress_xx_;
+    bool show_stress_yy_;
+    bool show_stress_xy_;
     bool show_deformed_;
     bool show_bcs_;
 
@@ -49,6 +52,9 @@ public:
           deform_scale_(100.0),
           show_mesh_(false),
           show_von_mises_(false),
+          show_stress_xx_(false),
+          show_stress_yy_(false),
+          show_stress_xy_(false),
           show_deformed_(false),
           show_bcs_(false),
           scale_(0), margin_x_(0), margin_y_(0),
@@ -82,6 +88,21 @@ public:
 
     SVGVisualization& von_mises() {
         show_von_mises_ = true;
+        return *this;
+    }
+
+    SVGVisualization& stress_xx() {
+        show_stress_xx_ = true;
+        return *this;
+    }
+
+    SVGVisualization& stress_yy() {
+        show_stress_yy_ = true;
+        return *this;
+    }
+
+    SVGVisualization& stress_xy() {
+        show_stress_xy_ = true;
         return *this;
     }
 
@@ -120,6 +141,12 @@ public:
         // Draw each requested element
         if (show_von_mises_) {
             draw_von_mises_impl(file);
+        } else if (show_stress_xx_) {
+            draw_stress_xx_impl(file);
+        } else if (show_stress_yy_) {
+            draw_stress_yy_impl(file);
+        } else if (show_stress_xy_) {
+            draw_stress_xy_impl(file);
         } else if (show_mesh_ || show_deformed_ || show_bcs_) {
             // Background for mesh region
             file << "<rect x=\"" << margin_x_ << "\" y=\"" << margin_y_ << "\" ";
@@ -221,6 +248,105 @@ private:
 
         // Colorbar
         write_colorbar(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), vm_min, vm_max);
+    }
+
+    void draw_stress_xx_impl(std::ofstream& file) {
+        // Find min/max values
+        double sxx_min = 1e308, sxx_max = -1e308;
+        for (int j = 0; j < fem_.ny; ++j) {
+            for (int i = 0; i < fem_.nx; ++i) {
+                double val = fem_.stress_xx(j, i);
+                sxx_min = std::min(sxx_min, val);
+                sxx_max = std::max(sxx_max, val);
+            }
+        }
+
+        // Draw colored elements
+        for (int j = 0; j < fem_.ny - 1; ++j) {
+            for (int i = 0; i < fem_.nx - 1; ++i) {
+                double val = 0.25 * (fem_.stress_xx(j, i) + fem_.stress_xx(j+1, i) +
+                                     fem_.stress_xx(j+1, i+1) + fem_.stress_xx(j, i+1));
+                std::string color = value_to_color(val, sxx_min, sxx_max);
+
+                double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
+                double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
+                double w = (fem_.width / (fem_.nx - 1)) * scale_x_;
+                double h = (fem_.height / (fem_.ny - 1)) * scale_y_;
+
+                file << "<rect x=\"" << x1 << "\" y=\"" << y1 << "\" ";
+                file << "width=\"" << w << "\" height=\"" << h << "\" ";
+                file << "fill=\"" << color << "\" stroke=\"none\"/>\n";
+            }
+        }
+
+        // Colorbar
+        write_colorbar(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), sxx_min, sxx_max);
+    }
+
+    void draw_stress_yy_impl(std::ofstream& file) {
+        // Find min/max values
+        double syy_min = 1e308, syy_max = -1e308;
+        for (int j = 0; j < fem_.ny; ++j) {
+            for (int i = 0; i < fem_.nx; ++i) {
+                double val = fem_.stress_yy(j, i);
+                syy_min = std::min(syy_min, val);
+                syy_max = std::max(syy_max, val);
+            }
+        }
+
+        // Draw colored elements
+        for (int j = 0; j < fem_.ny - 1; ++j) {
+            for (int i = 0; i < fem_.nx - 1; ++i) {
+                double val = 0.25 * (fem_.stress_yy(j, i) + fem_.stress_yy(j+1, i) +
+                                     fem_.stress_yy(j+1, i+1) + fem_.stress_yy(j, i+1));
+                std::string color = value_to_color(val, syy_min, syy_max);
+
+                double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
+                double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
+                double w = (fem_.width / (fem_.nx - 1)) * scale_x_;
+                double h = (fem_.height / (fem_.ny - 1)) * scale_y_;
+
+                file << "<rect x=\"" << x1 << "\" y=\"" << y1 << "\" ";
+                file << "width=\"" << w << "\" height=\"" << h << "\" ";
+                file << "fill=\"" << color << "\" stroke=\"none\"/>\n";
+            }
+        }
+
+        // Colorbar
+        write_colorbar(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), syy_min, syy_max);
+    }
+
+    void draw_stress_xy_impl(std::ofstream& file) {
+        // Find min/max values
+        double sxy_min = 1e308, sxy_max = -1e308;
+        for (int j = 0; j < fem_.ny; ++j) {
+            for (int i = 0; i < fem_.nx; ++i) {
+                double val = fem_.stress_xy(j, i);
+                sxy_min = std::min(sxy_min, val);
+                sxy_max = std::max(sxy_max, val);
+            }
+        }
+
+        // Draw colored elements
+        for (int j = 0; j < fem_.ny - 1; ++j) {
+            for (int i = 0; i < fem_.nx - 1; ++i) {
+                double val = 0.25 * (fem_.stress_xy(j, i) + fem_.stress_xy(j+1, i) +
+                                     fem_.stress_xy(j+1, i+1) + fem_.stress_xy(j, i+1));
+                std::string color = value_to_color(val, sxy_min, sxy_max);
+
+                double x1 = margin_x_ + i * (fem_.width / (fem_.nx - 1)) * scale_x_;
+                double y1 = margin_y_ + (fem_.height - (j + 1) * (fem_.height / (fem_.ny - 1))) * scale_y_;
+                double w = (fem_.width / (fem_.nx - 1)) * scale_x_;
+                double h = (fem_.height / (fem_.ny - 1)) * scale_y_;
+
+                file << "<rect x=\"" << x1 << "\" y=\"" << y1 << "\" ";
+                file << "width=\"" << w << "\" height=\"" << h << "\" ";
+                file << "fill=\"" << color << "\" stroke=\"none\"/>\n";
+            }
+        }
+
+        // Colorbar
+        write_colorbar(file, (int)(margin_x_ + fem_.width * scale_x_ + 20), (int)margin_y_, 20, (int)(fem_.height * scale_y_), sxy_min, sxy_max);
     }
 
     void draw_deformed_impl(std::ofstream& file) {
@@ -377,6 +503,30 @@ public:
             .margin(0.05)
             .width(600)
             .von_mises()
+            .write(filename);
+    }
+
+    static void write_stress_xx(const ElasticityFEM2D& fem, const std::string& filename) {
+        SVGVisualization(fem)
+            .margin(0.05)
+            .width(600)
+            .stress_xx()
+            .write(filename);
+    }
+
+    static void write_stress_yy(const ElasticityFEM2D& fem, const std::string& filename) {
+        SVGVisualization(fem)
+            .margin(0.05)
+            .width(600)
+            .stress_yy()
+            .write(filename);
+    }
+
+    static void write_stress_xy(const ElasticityFEM2D& fem, const std::string& filename) {
+        SVGVisualization(fem)
+            .margin(0.05)
+            .width(600)
+            .stress_xy()
             .write(filename);
     }
 

@@ -193,17 +193,17 @@ int main() {
 
     // Von Mises stress distribution
     SVGVisualization(problem)
-        .margin(0.05)
+        .margin(0.5)
         .width(600)
         .von_mises()
         .write("three_span_von_mises.svg");
 
     // Deformed geometry with undeformed overlay
     SVGVisualization(problem)
-        .margin(0.05)
+        .margin(0.5)
         .width(600)
         .deform_scale(100.0)
-        .mesh()
+        .mesh().von_mises()
         .deformed()
         .write("three_span_deformed.svg");
 
