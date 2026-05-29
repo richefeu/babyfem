@@ -1,0 +1,5 @@
+# Ignore everything except source files and Makefile
+*
+!*.cpp
+!Makefile
+!.gitignore
