@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <cmath>
 
 class SVGGenerator {
 public:
@@ -14,28 +15,23 @@ public:
 
         Matrix vm = fem.von_mises();
 
-        // Trouve min/max et collecte les valeurs
+        // Trouve min/max des valeurs non-zéro SEULEMENT
         double vm_min = 1e308, vm_max = -1e308;
-        std::vector<double> values;
-
         for (int j = 0; j < fem.ny; ++j) {
             for (int i = 0; i < fem.nx; ++i) {
                 double val = vm(j, i);
-                vm_min = std::min(vm_min, val);
-                vm_max = std::max(vm_max, val);
-                if (val > 1e6) values.push_back(val);  // Collecter non-zéro
+                if (val > 1e6) {  // > 1 MPa seulement
+                    vm_min = std::min(vm_min, val);
+                    vm_max = std::max(vm_max, val);
+                }
             }
         }
 
-        // Normaliser sur les percentiles plutôt que min/max global
-        // Cela donne meilleur contraste
-        if (!values.empty() && values.size() > 10) {
-            std::sort(values.begin(), values.end());
-            vm_min = values[values.size() / 20];      // 5ème percentile
-            vm_max = values[values.size() - 1];       // Max
+        // Fallback si tous les zéros
+        if (vm_min > vm_max) {
+            vm_min = 1e6;  // 1 MPa
+            vm_max = 1e10; // 10 GPa
         }
-
-        if (vm_max < vm_min + 1e-10) vm_max = vm_min + 1.0;
 
         // Échelle de dessin
         int svg_width = 800;
@@ -154,22 +150,16 @@ public:
 
 private:
     static std::string value_to_color(double val, double vmin, double vmax) {
-        // Normalisation logarithmique pour meilleur contraste
-        // Utile quand la distribution est très inhomogène
+        // Échelle logarithmique pour distributions biaisées
         double norm;
 
-        if (vmax <= 0.0) {
-            norm = 0.0;
-        } else if (val <= 0.0) {
-            norm = 0.0;
-        } else {
-            // Normalisation log: log(val) mieux que (val - vmin)
-            // pour voir les variations dans les zones de faible contrainte
-            double log_val = std::log10(val + 1e-12);
-            double log_vmax = std::log10(vmax + 1e-12);
-            double log_vmin = std::log10(vmin + 1e-12);
-            norm = (log_val - log_vmin) / (log_vmax - log_vmin);
-        }
+        // Ajouter petit offset pour éviter log(0)
+        double offset = vmax * 1e-4;  // 0.01% du max
+        double log_val = std::log10(val + offset);
+        double log_vmin = std::log10(vmin + offset);
+        double log_vmax = std::log10(vmax + offset);
+
+        norm = (log_val - log_vmin) / (log_vmax - log_vmin);
         norm = std::max(0.0, std::min(1.0, norm));
 
         // Jet colormap: blue -> cyan -> green -> yellow -> red

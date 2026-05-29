@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/vincent/devel/babyFEM_proto_cpp/build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

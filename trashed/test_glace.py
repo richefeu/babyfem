@@ -48,8 +48,17 @@ bc = {
 }
 problem.solve(bc)
 problem.compute_stress()
+
+# Diagnostic: Distribution des contraintes von Mises par ligne (y)
+print("\nContrainte von Mises par ligne (y):")
+vm = np.sqrt(problem.stress_xx**2 + problem.stress_yy**2 - problem.stress_xx*problem.stress_yy + 3.0*problem.stress_xy**2)
+for j in range(problem.ny-1, -1, -(problem.ny//6 + 1)):  # Afficher ~6 lignes
+    y_pos = j * (h / (problem.ny - 1))
+    max_on_line = np.max(vm[j, :])
+    print(f"  y={y_pos:.4f} m: max σ = {max_on_line:.4e} GPa")
+
 #ElasticityVisualizer.plot_displacement_and_stress(problem, "Poutre appuyée - Charge répartie")
-ElasticityVisualizer.plot_von_mises(problem, "Poutre appuyée - Charge répartie")
+#ElasticityVisualizer.plot_von_mises(problem, "Poutre appuyée - Charge répartie")
 #ElasticityVisualizer.plot_deformed_geometry(problem, scale=100, title="Poutre appuyée - Géométrie déformée")
 
-plt.show()
+#plt.show()
