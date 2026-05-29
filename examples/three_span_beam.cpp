@@ -169,7 +169,7 @@ int main() {
                   << " m: max σ = " << std::scientific << (max_on_line / 1e9) << " GPa\n";
     }
 
-    // Export SVG
+    // Export SVG using modern fluent API
     std::cout << "\nExport SVG...\n";
 
     // Combine all support nodes
@@ -183,10 +183,29 @@ int main() {
     all_loads.insert(all_loads.end(), zone_charge_1.begin(), zone_charge_1.end());
     all_loads.insert(all_loads.end(), zone_charge_2.begin(), zone_charge_2.end());
 
-    // Visualizations
-    SVGGenerator::write_mesh_with_bcs(problem, "three_span_mesh.svg", all_supports, all_loads);
-    SVGGenerator::write_von_mises(problem, "three_span_von_mises.svg");
-    SVGGenerator::write_deformed(problem, "three_span_deformed.svg", 100.0);
+    // Mesh with boundary conditions and loads
+    SVGVisualization(problem)
+        .margin(0.1)
+        .width(600)
+        .mesh()
+        .boundary_conditions(all_supports, all_loads)
+        .write("three_span_mesh.svg");
+
+    // Von Mises stress distribution
+    SVGVisualization(problem)
+        .margin(0.05)
+        .width(600)
+        .von_mises()
+        .write("three_span_von_mises.svg");
+
+    // Deformed geometry with undeformed overlay
+    SVGVisualization(problem)
+        .margin(0.05)
+        .width(600)
+        .deform_scale(100.0)
+        .mesh()
+        .deformed()
+        .write("three_span_deformed.svg");
 
     std::cout << "\n✓ Cas three_span_beam résolu avec succès!\n";
     std::cout << std::string(80, '=') << "\n";
