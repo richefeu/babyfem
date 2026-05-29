@@ -191,10 +191,24 @@ int main() {
                   << " m: max σ = " << std::scientific << (max_on_line / 1e9) << " GPa\n";
     }
 
-    // Export SVG
+    // Export SVG using modern fluent API
     std::cout << "\nExport SVG...\n";
-    SVGGenerator::write_von_mises(problem, "test_glace_von_mises.svg");
-    SVGGenerator::write_deformed(problem, "test_glace_deformed.svg", 100.0);
+
+    // Von Mises stress distribution
+    SVGVisualization(problem)
+        .margin(0.05)
+        .width(600)
+        .von_mises()
+        .write("test_glace_von_mises.svg");
+
+    // Deformed geometry with undeformed overlay
+    SVGVisualization(problem)
+        .margin(0.05)
+        .width(600)
+        .deform_scale(100.0)
+        .mesh()
+        .deformed()
+        .write("test_glace_deformed.svg");
 
     std::cout << "\n✓ Cas test_glace résolu avec succès!\n";
     std::cout << std::string(80, '=') << "\n";
