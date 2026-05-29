@@ -13,8 +13,8 @@ int main() {
     // Géométrie
     double L = 0.1;          // Longueur (m)
     double h = 0.02;         // Hauteur (m)
-    int nx = 60 * 2;         // 120 nœuds en x
-    int ny = 6 * 2;          // 12 nœuds en y
+    int nx = 60 * 4;         // 120 nœuds en x
+    int ny = 6 * 4;          // 12 nœuds en y
     int n_nodes = nx * ny;
     int n_dof = 2 * n_nodes;
 
@@ -99,7 +99,7 @@ int main() {
     }
 
     // Utiliser la méthode solve() du solveur avec les deux types de BC
-    problem.solve(bcs, node_bcs);
+    problem.solve_sparse(bcs, node_bcs);
 
     // Note: Alternative sparse solver avec Conjugate Gradient disponible:
     // SparseSolver::Options opts;

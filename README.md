@@ -1,3 +1,7 @@
+<p align="center">
+<img src="./babyFEM-logo.png" width="50%"/>
+</p>
+
 # Solveur FEM 2D - Prototype C++17 (sans dépendances)
 
 ## 🎯 Vue d'ensemble
