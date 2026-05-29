@@ -51,4 +51,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/fem_solver.dir/DependInfo.cmake"
   "CMakeFiles/example_traction.dir/DependInfo.cmake"
   "CMakeFiles/example_shear.dir/DependInfo.cmake"
+  "CMakeFiles/example_test_glace.dir/DependInfo.cmake"
   )

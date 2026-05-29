@@ -1,5 +1,6 @@
 /Users/vincent/devel/babyFEM_proto_cpp/build/CMakeFiles/fem_solver.dir
 /Users/vincent/devel/babyFEM_proto_cpp/build/CMakeFiles/example_traction.dir
 /Users/vincent/devel/babyFEM_proto_cpp/build/CMakeFiles/example_shear.dir
+/Users/vincent/devel/babyFEM_proto_cpp/build/CMakeFiles/example_test_glace.dir
 /Users/vincent/devel/babyFEM_proto_cpp/build/CMakeFiles/edit_cache.dir
 /Users/vincent/devel/babyFEM_proto_cpp/build/CMakeFiles/rebuild_cache.dir

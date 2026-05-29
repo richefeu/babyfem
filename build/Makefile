@@ -155,6 +155,19 @@ example_shear/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/example_shear.dir/build.make CMakeFiles/example_shear.dir/build
 .PHONY : example_shear/fast
 
+#=============================================================================
+# Target rules for targets named example_test_glace
+
+# Build rule for target.
+example_test_glace: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 example_test_glace
+.PHONY : example_test_glace
+
+# fast build rule for target.
+example_test_glace/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/example_test_glace.dir/build.make CMakeFiles/example_test_glace.dir/build
+.PHONY : example_test_glace/fast
+
 examples/shear.o: examples/shear.cpp.o
 .PHONY : examples/shear.o
 
@@ -178,6 +191,30 @@ examples/shear.s: examples/shear.cpp.s
 examples/shear.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/example_shear.dir/build.make CMakeFiles/example_shear.dir/examples/shear.cpp.s
 .PHONY : examples/shear.cpp.s
+
+examples/test_glace.o: examples/test_glace.cpp.o
+.PHONY : examples/test_glace.o
+
+# target to build an object file
+examples/test_glace.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/example_test_glace.dir/build.make CMakeFiles/example_test_glace.dir/examples/test_glace.cpp.o
+.PHONY : examples/test_glace.cpp.o
+
+examples/test_glace.i: examples/test_glace.cpp.i
+.PHONY : examples/test_glace.i
+
+# target to preprocess a source file
+examples/test_glace.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/example_test_glace.dir/build.make CMakeFiles/example_test_glace.dir/examples/test_glace.cpp.i
+.PHONY : examples/test_glace.cpp.i
+
+examples/test_glace.s: examples/test_glace.cpp.s
+.PHONY : examples/test_glace.s
+
+# target to generate assembly for a file
+examples/test_glace.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/example_test_glace.dir/build.make CMakeFiles/example_test_glace.dir/examples/test_glace.cpp.s
+.PHONY : examples/test_glace.cpp.s
 
 examples/traction.o: examples/traction.cpp.o
 .PHONY : examples/traction.o
@@ -236,11 +273,15 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... example_shear"
+	@echo "... example_test_glace"
 	@echo "... example_traction"
 	@echo "... fem_solver"
 	@echo "... examples/shear.o"
 	@echo "... examples/shear.i"
 	@echo "... examples/shear.s"
+	@echo "... examples/test_glace.o"
+	@echo "... examples/test_glace.i"
+	@echo "... examples/test_glace.s"
 	@echo "... examples/traction.o"
 	@echo "... examples/traction.i"
 	@echo "... examples/traction.s"

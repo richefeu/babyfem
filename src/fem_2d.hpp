@@ -38,9 +38,9 @@ public:
     }
 
     // Inverse : (i, j) du nœud
-    std::pair<int, int> get_coords(int node_idx) const {
-        int j = node_idx / nx;
-        int i = node_idx % nx;
+    std::pair<int, int> get_coords(int node_idx_val) const {
+        int j = node_idx_val / nx;
+        int i = node_idx_val % nx;
         return {i, j};
     }
 
@@ -52,6 +52,58 @@ public:
     // DOF pour déplacement v au nœud (i, j)
     int dof_v(int i, int j) const {
         return 2 * node_idx(i, j) + 1;
+    }
+
+    // Sélectionne les nœuds sur une limite entre deux positions
+    std::vector<int> select_nodes_on_line(const std::string& boundary,
+                                          double coord_min = -1e308,
+                                          double coord_max = 1e308) const {
+        std::vector<int> nodes;
+        double x_min = coord_min, x_max = coord_max;
+        double y_min = coord_min, y_max = coord_max;
+
+        if (boundary == "bottom") {
+            if (x_min < -1e308) x_min = 0.0;
+            if (x_max > 1e308) x_max = width;
+            for (int i = 0; i < nx; ++i) {
+                double x = i * (width / (nx - 1));
+                if (x >= x_min - 1e-10 && x <= x_max + 1e-10) {
+                    nodes.push_back(node_idx(i, 0));
+                }
+            }
+        }
+        else if (boundary == "top") {
+            if (x_min < -1e308) x_min = 0.0;
+            if (x_max > 1e308) x_max = width;
+            for (int i = 0; i < nx; ++i) {
+                double x = i * (width / (nx - 1));
+                if (x >= x_min - 1e-10 && x <= x_max + 1e-10) {
+                    nodes.push_back(node_idx(i, ny - 1));
+                }
+            }
+        }
+        else if (boundary == "left") {
+            if (y_min < -1e308) y_min = 0.0;
+            if (y_max > 1e308) y_max = height;
+            for (int j = 0; j < ny; ++j) {
+                double y = j * (height / (ny - 1));
+                if (y >= y_min - 1e-10 && y <= y_max + 1e-10) {
+                    nodes.push_back(node_idx(0, j));
+                }
+            }
+        }
+        else if (boundary == "right") {
+            if (y_min < -1e308) y_min = 0.0;
+            if (y_max > 1e308) y_max = height;
+            for (int j = 0; j < ny; ++j) {
+                double y = j * (height / (ny - 1));
+                if (y >= y_min - 1e-10 && y <= y_max + 1e-10) {
+                    nodes.push_back(node_idx(nx - 1, j));
+                }
+            }
+        }
+
+        return nodes;
     }
 
     // Matrice de rigidité locale pour élément Q1 bilinéaire
@@ -161,8 +213,8 @@ public:
         return K;
     }
 
-    // Applique une condition aux limites (DDL fixe)
-    void apply_dirichlet(Matrix& K, Vector& F, int dof, double value) {
+    // Applique une condition aux limites (DDL fixe) - PUBLIC
+    void apply_dirichlet(Matrix& K, Vector& F, int dof, double value) const {
         // Zéro la ligne et la colonne
         for (int j = 0; j < K.cols(); ++j) {
             K(dof, j) = 0.0;

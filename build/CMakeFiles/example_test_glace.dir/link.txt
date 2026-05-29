@@ -1,0 +1,1 @@
+/usr/bin/c++  -Wall -Wextra -O2 -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/example_test_glace.dir/examples/test_glace.cpp.o -o example_test_glace

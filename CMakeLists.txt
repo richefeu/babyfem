@@ -15,3 +15,4 @@ add_executable(fem_solver
 # Tests/exemples
 add_executable(example_traction examples/traction.cpp)
 add_executable(example_shear examples/shear.cpp)
+add_executable(example_test_glace examples/test_glace.cpp)
