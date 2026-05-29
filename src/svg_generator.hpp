@@ -390,31 +390,44 @@ private:
     // Deformed shape
     // =================================================================
     void draw_deformed(std::ofstream& f) const {
-        // Undeformed reference (light gray)
-        f << "<g stroke=\"#ddd\" fill=\"none\" stroke-width=\"0.5\">\n";
-        for (int j = 0; j < fem_.ny - 1; ++j)
-            for (int i = 0; i < fem_.nx - 1; ++i)
-                f << "<rect x=\"" << px(i) << "\" y=\"" << py(j+1)
-                  << "\" width=\"" << ew() << "\" height=\"" << eh() << "\"/>\n";
-        f << "</g>\n";
+        // Pixel coords of a deformed node
+        auto xd = [&](int i, int j) {
+            return mx_ + (i * fem_.dx + fem_.u[fem_.node_idx(i,j)] * deform_scale_) * sx_;
+        };
+        auto yd = [&](int i, int j) {
+            return TITLE_H + my_
+                 + (fem_.height - (j * fem_.dy + fem_.v[fem_.node_idx(i,j)] * deform_scale_)) * sy_;
+        };
 
-        // Deformed mesh (blue)
-        f << "<g stroke=\"#0055cc\" fill=\"none\" stroke-width=\"1.5\">\n";
-        for (int j = 0; j < fem_.ny - 1; ++j) {
-            for (int i = 0; i < fem_.nx - 1; ++i) {
-                // Loop over 4 corners + closing vertex
-                const int ci[5] = {i,   i+1, i+1, i,   i  };
-                const int cj[5] = {j,   j,   j+1, j+1, j  };
-                f << "<polyline points=\"";
-                for (int k = 0; k < 5; ++k) {
-                    int idx = fem_.node_idx(ci[k], cj[k]);
-                    double x = mx_ + (ci[k] * fem_.dx + fem_.u[idx] * deform_scale_) * sx_;
-                    double y = TITLE_H + my_
-                             + (fem_.height - (cj[k] * fem_.dy + fem_.v[idx] * deform_scale_)) * sy_;
-                    f << x << "," << y << (k < 4 ? " " : "");
-                }
-                f << "\"/>\n";
-            }
+        // Undeformed reference: simple gray bounding box
+        f << "<rect x=\"" << mx_ << "\" y=\"" << (TITLE_H + my_)
+          << "\" width=\""  << (fem_.width  * sx_)
+          << "\" height=\"" << (fem_.height * sy_)
+          << "\" fill=\"none\" stroke=\"#ccc\" stroke-width=\"1\"/>\n";
+
+        // Deformed outer contour (closed polygon)
+        f << "<polygon fill=\"none\" stroke=\"#0055cc\" stroke-width=\"2\" points=\"";
+        for (int i = 0;           i < fem_.nx;  ++i) f << xd(i, 0)          << "," << yd(i, 0)          << " ";
+        for (int j = 1;           j < fem_.ny;  ++j) f << xd(fem_.nx-1, j)  << "," << yd(fem_.nx-1, j)  << " ";
+        for (int i = fem_.nx - 2; i >= 0;       --i) f << xd(i, fem_.ny-1)  << "," << yd(i, fem_.ny-1)  << " ";
+        for (int j = fem_.ny - 2; j > 0;        --j) f << xd(0, j)          << "," << yd(0, j)          << " ";
+        f << "\"/>\n";
+
+        // Internal fibers: a few horizontal lines + vertical cross-sections
+        f << "<g stroke=\"#4488ee\" fill=\"none\" stroke-width=\"0.8\" stroke-dasharray=\"4,2\">\n";
+
+        int sj = std::max(1, fem_.ny / 5);
+        for (int j = sj; j < fem_.ny - 1; j += sj) {
+            f << "<polyline points=\"";
+            for (int i = 0; i < fem_.nx; ++i) f << xd(i, j) << "," << yd(i, j) << " ";
+            f << "\"/>\n";
+        }
+
+        int si = std::max(1, fem_.nx / 10);
+        for (int i = si; i < fem_.nx - 1; i += si) {
+            f << "<polyline points=\"";
+            for (int j = 0; j < fem_.ny; ++j) f << xd(i, j) << "," << yd(i, j) << " ";
+            f << "\"/>\n";
         }
         f << "</g>\n";
     }
