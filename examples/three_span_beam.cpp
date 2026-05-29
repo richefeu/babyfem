@@ -186,7 +186,7 @@ int main() {
     // Visualizations
     SVGGenerator::write_mesh_with_bcs(problem, "three_span_mesh.svg", all_supports, all_loads);
     SVGGenerator::write_von_mises(problem, "three_span_von_mises.svg");
-    SVGGenerator::write_deformed(problem, "three_span_deformed.svg", 500.0);
+    SVGGenerator::write_deformed(problem, "three_span_deformed.svg", 100.0);
 
     std::cout << "\n✓ Cas three_span_beam résolu avec succès!\n";
     std::cout << std::string(80, '=') << "\n";

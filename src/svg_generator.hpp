@@ -33,11 +33,18 @@ public:
             vm_max = 1e10; // 10 GPa
         }
 
-        // Échelle de dessin
-        int svg_width = 800;
-        int svg_height = 400;
-        double scale_x = svg_width / fem.width;
-        double scale_y = svg_height / fem.height;
+        // Échelle de dessin avec rapport d'aspect préservé
+        double margin_ratio = 0.05;
+        double target_size = 600.0;
+        double max_dim = std::max(fem.width, fem.height);
+        double scale = target_size / (max_dim * (1.0 + 2.0 * margin_ratio));
+        double margin_x = margin_ratio * fem.width * scale;
+        double margin_y = margin_ratio * fem.height * scale;
+
+        int svg_width = (int)(fem.width * scale + 2.0 * margin_x + 100);  // +100 pour colorbar
+        int svg_height = (int)(fem.height * scale + 2.0 * margin_y);
+        double scale_x = scale;
+        double scale_y = scale;
 
         // En-tête SVG
         file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -53,9 +60,9 @@ public:
                 double val = 0.25 * (vm(j, i) + vm(j+1, i) + vm(j+1, i+1) + vm(j, i+1));
                 std::string color = value_to_color(val, vm_min, vm_max);
 
-                // Coordonnées du rectangle
-                double x1 = i * (fem.width / (fem.nx - 1)) * scale_x;
-                double y1 = (fem.height - (j + 1) * (fem.height / (fem.ny - 1))) * scale_y;
+                // Coordonnées du rectangle (avec marges)
+                double x1 = margin_x + i * (fem.width / (fem.nx - 1)) * scale_x;
+                double y1 = margin_y + (fem.height - (j + 1) * (fem.height / (fem.ny - 1))) * scale_y;
                 double w = (fem.width / (fem.nx - 1)) * scale_x;
                 double h = (fem.height / (fem.ny - 1)) * scale_y;
 
@@ -68,18 +75,18 @@ public:
         // Grille (optionnel)
         file << "<!-- Grid -->\n";
         for (int i = 0; i < fem.nx; i += (fem.nx / 10 + 1)) {
-            double x = i * (fem.width / (fem.nx - 1)) * scale_x;
-            file << "<line x1=\"" << x << "\" y1=\"0\" x2=\"" << x << "\" y2=\""
-                 << svg_height << "\" stroke=\"lightgray\" stroke-width=\"0.5\"/>\n";
+            double x = margin_x + i * (fem.width / (fem.nx - 1)) * scale_x;
+            file << "<line x1=\"" << x << "\" y1=\"" << margin_y << "\" x2=\"" << x << "\" y2=\""
+                 << (margin_y + fem.height * scale_y) << "\" stroke=\"lightgray\" stroke-width=\"0.5\"/>\n";
         }
         for (int j = 0; j < fem.ny; j += (fem.ny / 10 + 1)) {
-            double y = (fem.height - j * (fem.height / (fem.ny - 1))) * scale_y;
-            file << "<line x1=\"0\" y1=\"" << y << "\" x2=\"" << svg_width << "\" y2=\""
-                 << y << "\" stroke=\"lightgray\" stroke-width=\"0.5\"/>\n";
+            double y = margin_y + (fem.height - j * (fem.height / (fem.ny - 1))) * scale_y;
+            file << "<line x1=\"" << margin_x << "\" y1=\"" << y << "\" x2=\""
+                 << (margin_x + fem.width * scale_x) << "\" y2=\"" << y << "\" stroke=\"lightgray\" stroke-width=\"0.5\"/>\n";
         }
 
-        // Colorbar
-        write_colorbar(file, svg_width + 50, 20, 20, svg_height - 40, vm_min, vm_max);
+        // Colorbar (à droite du dessin)
+        write_colorbar(file, (int)(margin_x + fem.width * scale_x + 20), (int)margin_y, 20, (int)(fem.height * scale_y), vm_min, vm_max);
 
         file << "</svg>\n";
         file.close();
@@ -89,29 +96,37 @@ public:
 
 public:
     static void write_deformed(const ElasticityFEM2D& fem, const std::string& filename,
-                               double scale = 100.0) {
+                               double deform_scale = 100.0) {
         std::ofstream file(filename);
         if (!file.is_open()) {
             throw std::runtime_error("Cannot open file: " + filename);
         }
 
-        int svg_width = 800;
-        int svg_height = 400;
-        double scale_x = svg_width / fem.width;
-        double scale_y = svg_height / fem.height;
+        // Échelle de dessin avec rapport d'aspect préservé
+        double margin_ratio = 0.05;
+        double target_size = 600.0;
+        double max_dim = std::max(fem.width, fem.height);
+        double scale = target_size / (max_dim * (1.0 + 2.0 * margin_ratio));
+        double margin_x = margin_ratio * fem.width * scale;
+        double margin_y = margin_ratio * fem.height * scale;
+
+        int svg_width = (int)(fem.width * scale + 2.0 * margin_x);
+        int svg_height = (int)(fem.height * scale + 2.0 * margin_y);
+        double scale_x = scale;
+        double scale_y = scale;
 
         file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-        file << "<svg width=\"" << (svg_width + 100) << "\" height=\"" << svg_height << "\" ";
+        file << "<svg width=\"" << svg_width << "\" height=\"" << svg_height << "\" ";
         file << "xmlns=\"http://www.w3.org/2000/svg\">\n";
-        file << "<rect width=\"" << (svg_width + 100) << "\" height=\"" << svg_height
+        file << "<rect width=\"" << svg_width << "\" height=\"" << svg_height
              << "\" fill=\"white\"/>\n";
 
         // Géométrie inerte (gris clair)
         file << "<g stroke=\"lightgray\" fill=\"none\" stroke-width=\"1\">\n";
         for (int j = 0; j < fem.ny - 1; ++j) {
             for (int i = 0; i < fem.nx - 1; ++i) {
-                double x1 = i * (fem.width / (fem.nx - 1)) * scale_x;
-                double y1 = (fem.height - (j + 1) * (fem.height / (fem.ny - 1))) * scale_y;
+                double x1 = margin_x + i * (fem.width / (fem.nx - 1)) * scale_x;
+                double y1 = margin_y + (fem.height - (j + 1) * (fem.height / (fem.ny - 1))) * scale_y;
                 double w = (fem.width / (fem.nx - 1)) * scale_x;
                 double h = (fem.height / (fem.ny - 1)) * scale_y;
 
@@ -130,10 +145,10 @@ public:
 
                 file << "<polyline points=\"";
                 for (int k = 0; k < 5; ++k) {
-                    double x = (xi[k] * (fem.width / (fem.nx - 1)) +
-                               fem.u[fem.node_idx((int)xi[k], (int)yi[k])] * scale) * scale_x;
-                    double y = (fem.height - (yi[k] * (fem.height / (fem.ny - 1)) +
-                               fem.v[fem.node_idx((int)xi[k], (int)yi[k])] * scale)) * scale_y;
+                    double x = margin_x + (xi[k] * (fem.width / (fem.nx - 1)) +
+                               fem.u[fem.node_idx((int)xi[k], (int)yi[k])] * deform_scale) * scale_x;
+                    double y = margin_y + (fem.height - (yi[k] * (fem.height / (fem.ny - 1)) +
+                               fem.v[fem.node_idx((int)xi[k], (int)yi[k])] * deform_scale)) * scale_y;
                     file << x << "," << y;
                     if (k < 4) file << " ";
                 }

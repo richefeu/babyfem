@@ -194,7 +194,7 @@ int main() {
     // Export SVG
     std::cout << "\nExport SVG...\n";
     SVGGenerator::write_von_mises(problem, "test_glace_von_mises.svg");
-    SVGGenerator::write_deformed(problem, "test_glace_deformed.svg", 500.0);
+    SVGGenerator::write_deformed(problem, "test_glace_deformed.svg", 100.0);
 
     std::cout << "\n✓ Cas test_glace résolu avec succès!\n";
     std::cout << std::string(80, '=') << "\n";
