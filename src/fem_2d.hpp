@@ -30,9 +30,14 @@ public:
 
         u.resize(ny * nx, 0.0);
         v.resize(ny * nx, 0.0);
+
+        // Vérifier la cohérence de l'indexage
+        if (!verify_indexing()) {
+            throw std::runtime_error("Node indexing verification failed!");
+        }
     }
 
-    // Index global du nœud (i, j)
+    // Index global du nœud (i, j) - row-major: j*nx + i
     int node_idx(int i, int j) const {
         return j * nx + i;
     }
@@ -42,6 +47,18 @@ public:
         int j = node_idx_val / nx;
         int i = node_idx_val % nx;
         return {i, j};
+    }
+
+    // Vérification de cohérence
+    bool verify_indexing() const {
+        for (int j = 0; j < ny; ++j) {
+            for (int i = 0; i < nx; ++i) {
+                int idx = node_idx(i, j);
+                auto [i_back, j_back] = get_coords(idx);
+                if (i_back != i || j_back != j) return false;
+            }
+        }
+        return true;
     }
 
     // DOF pour déplacement u au nœud (i, j)
@@ -213,27 +230,46 @@ public:
         return K;
     }
 
-    // Applique une condition aux limites (DDL fixe) - PUBLIC
+    // Applique une condition aux limites (DDL fixe) avec CONSTRAINT ELIMINATION
+    // au lieu de la méthode des pénalités (qui casse le couplage)
     void apply_dirichlet(Matrix& K, Vector& F, int dof, double value) const {
-        // Zéro la ligne et la colonne
+        // FIX: Use constraint elimination instead of penalty method
+        // Subtract the contribution of this constrained DOF from all equations
+        // F[i] -= K[i, dof] * value for all i
+        // Then zero row and column to implement the constraint
+
+        for (int i = 0; i < K.rows(); ++i) {
+            if (i != dof) {
+                F[i] -= K(i, dof) * value;
+            }
+        }
+
+        // Now apply the penalty method ON TOP of constraint elimination
+        // This preserves the coupling better
         for (int j = 0; j < K.cols(); ++j) {
             K(dof, j) = 0.0;
         }
         for (int i = 0; i < K.rows(); ++i) {
             K(i, dof) = 0.0;
         }
-        // Diagonale = 1
         K(dof, dof) = 1.0;
         F[dof] = value;
     }
 
     // Résout le système avec conditions aux limites
-    void solve(const std::map<std::string, std::vector<std::pair<int, double>>>& bcs) {
+    void solve(const std::map<std::string, std::vector<std::pair<int, double>>>& bcs,
+               const std::vector<std::tuple<int, int, double>>& node_bcs = {}) {
         Matrix K = assemble_global_matrix();
         Vector F(n_dof, 0.0);
 
-        // Appliquer les conditions aux limites
+        // Diagnostic: Vérifier quelques entrées de la matrice avant BCs
+        double K_sample_uu = K(dof_u(nx/2, ny/2), dof_u(nx/2, ny/2));  // Stiffness at interior u DOF
+        std::cout << "DEBUG: K(" << dof_u(nx/2, ny/2) << "," << dof_u(nx/2, ny/2) << ") = " << K_sample_uu << "\n";
+
+        // Appliquer les conditions aux limites sur les bords
         for (const auto& [boundary, bc_list] : bcs) {
+            if (boundary == "nodes") continue;  // Traité séparément
+
             if (boundary == "bottom") {
                 int j = 0;
                 for (const auto& [comp, value] : bc_list) {
@@ -272,16 +308,29 @@ public:
             }
         }
 
+        // Appliquer les BC sur nœuds du paramètre
+        for (const auto& [node_idx, comp, value] : node_bcs) {
+            auto [i, j] = get_coords(node_idx);
+            int dof = (comp == 0) ? dof_u(i, j) : dof_v(i, j);
+            apply_dirichlet(K, F, dof, value);
+        }
+
         // Résoudre
         Vector u_full = GaussSolver::solve(K, F);
 
         // Extraire u et v
+        if (u_full.size() != n_dof) {
+            throw std::runtime_error("Solver result size mismatch");
+        }
+
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
-                u[node_idx(i, j)] = u_full[dof_u(i, j)];
-                v[node_idx(i, j)] = u_full[dof_v(i, j)];
+                int node = node_idx(i, j);
+                u[node] = u_full[dof_u(i, j)];
+                v[node] = u_full[dof_v(i, j)];
             }
         }
+
     }
 
     // Calcule les contraintes à partir des déplacements

@@ -57,78 +57,49 @@ int main() {
     std::cout << "  Appui droit: nœuds [" << (L - Lappui) << ", " << L << "] en bas → v = 0\n";
     std::cout << "  Zone de charge: nœuds [" << (Lappui + delta) << ", " << (L - Lappui - delta)
               << "] en haut → v = -" << depl << "\n";
-    std::cout << "  Blocage latéral: u = 0 à gauche\n\n";
+    std::cout << "  Blocage latéral: u = 0 au nœud (0,0)\n\n";
 
     std::cout << "Sélections:\n";
     std::cout << "  Appui gauche: " << appui_gauche.size() << " nœuds\n";
     std::cout << "  Appui droit: " << appui_droit.size() << " nœuds\n";
     std::cout << "  Total appuis: " << appuis.size() << " nœuds\n";
-    std::cout << "  Zone de charge: " << zone_charge.size() << " nœuds\n\n";
+    std::cout << "  Zone de charge: " << zone_charge.size() << " nœuds\n";
+
+    // CRITICAL: Vérifier que les zones ne sont pas vides
+    if (appuis.empty() || zone_charge.empty()) {
+        std::cerr << "ERREUR CRITIQUE: Appuis ou zone_charge est vide!\n";
+        return 1;
+    }
+
+    std::cout << "  Premier appui: nœud " << appuis.front() << ", dernier: " << appuis.back() << "\n";
+    std::cout << "  Première charge: nœud " << zone_charge.front() << ", dernière: " << zone_charge.back() << "\n\n";
 
     // Résoudre
     std::cout << "Assemblage et résolution...\n";
+    // Conditions aux limites sur les bords
     std::map<std::string, std::vector<std::pair<int, double>>> bcs;
+    // NOTE: Apply u=0 only at bottom-left corner to prevent rigid motion,
+    // NOT on entire left edge (which would decouple u-v coupling)
 
-    // Blocage latéral
-    bcs["left"] = {{0, 0.0}};
+    // Conditions aux limites sur nœuds spécifiques (node_idx, component, value)
+    std::vector<std::tuple<int, int, double>> node_bcs;
 
-    // Conditions aux limites sur nœuds spécifiques
-    std::vector<std::pair<int, double>> node_bcs;
+    // FIX: Apply u=0 ONLY at bottom-left corner to prevent rigid motion
+    // Applying on entire left edge destroys u-v coupling via penalty method
+    node_bcs.push_back(std::make_tuple(0, 0, 0.0));  // u=0 at node (0,0)
 
     // Appuis: v = 0
     for (int node_idx : appuis) {
-        node_bcs.push_back({node_idx, 0.0});
+        node_bcs.push_back(std::make_tuple(node_idx, 1, 0.0));
     }
 
     // Zone de charge: v = -depl
     for (int node_idx : zone_charge) {
-        node_bcs.push_back({node_idx, -depl});
+        node_bcs.push_back(std::make_tuple(node_idx, 1, -depl));
     }
 
-    // Créer les BC au format du solveur (node, component, value)
-    for (const auto& [node_idx, value] : node_bcs) {
-        auto [i, j] = problem.get_coords(node_idx);
-        // On utilise le format nodes si available
-    }
-
-    // Nota: Le solveur C++ ne supporte pas encore le format {node: [...]}
-    // On doit appliquer les conditions aux limites via une interface étendue
-    // Pour l'instant, nous allons ajouter une méthode spécialisée
-
-    // Appliquer les conditions aux limites via apply_bc_on_nodes
-    Matrix K = problem.assemble_global_matrix();
-    Vector F(n_dof, 0.0);
-
-    // Appliquer blocage latéral (u=0 à gauche)
-    for (int j = 0; j < ny; ++j) {
-        int dof = problem.dof_u(0, j);
-        problem.apply_dirichlet(K, F, dof, 0.0);
-    }
-
-    // Appliquer appuis (v=0)
-    for (int node_idx : appuis) {
-        auto [i, j] = problem.get_coords(node_idx);
-        int dof = problem.dof_v(i, j);
-        problem.apply_dirichlet(K, F, dof, 0.0);
-    }
-
-    // Appliquer charge (v=-depl)
-    for (int node_idx : zone_charge) {
-        auto [i, j] = problem.get_coords(node_idx);
-        int dof = problem.dof_v(i, j);
-        problem.apply_dirichlet(K, F, dof, -depl);
-    }
-
-    // Résoudre
-    Vector u_full = GaussSolver::solve(K, F);
-
-    // Extraire les déplacements
-    for (int j = 0; j < ny; ++j) {
-        for (int i = 0; i < nx; ++i) {
-            problem.u[problem.node_idx(i, j)] = u_full[problem.dof_u(i, j)];
-            problem.v[problem.node_idx(i, j)] = u_full[problem.dof_v(i, j)];
-        }
-    }
+    // Utiliser la méthode solve() du solveur avec les deux types de BC
+    problem.solve(bcs, node_bcs);
 
     std::cout << "Calcul des contraintes...\n";
     problem.compute_stress();
@@ -206,6 +177,18 @@ int main() {
         }
         std::cout << "  > " << std::fixed << std::setprecision(2) << (threshold / 1e9)
                   << " GPa: " << count << " nœuds\n";
+    }
+
+    // Distribution détaillée par lignes (y)
+    std::cout << "\nContrainte von Mises par ligne (y):\n";
+    for (int j = ny - 1; j >= 0; j -= std::max(1, ny / 6)) {  // 6 lignes
+        double max_on_line = 0.0;
+        for (int i = 0; i < nx; ++i) {
+            max_on_line = std::max(max_on_line, vm(j, i));
+        }
+        double y_pos = j * (h / (ny - 1));
+        std::cout << "  y=" << std::fixed << std::setprecision(4) << y_pos
+                  << " m: max σ = " << std::scientific << (max_on_line / 1e9) << " GPa\n";
     }
 
     // Export SVG
