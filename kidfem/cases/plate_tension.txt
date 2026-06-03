@@ -1,0 +1,22 @@
+# =====================================================================
+# Plaque encastrée à gauche, traction horizontale uniforme à droite.
+#
+# Maillage triangulaire (gmsh, voir plate.geo). État de contrainte quasi
+# uniaxial : loin de l'encastrement, sigma_xx ~ traction appliquée (1 MPa),
+# sigma_yy ~ 0 -> von Mises ~ 1 MPa. C'est le régime où le triangle linéaire
+# (CST, contrainte constante par élément) est le plus précis.
+# =====================================================================
+
+mesh file=plate.msh
+material E=210e9 nu=0.3
+solver sparse
+
+# Encastrement complet du bord gauche
+fix u v on "left"
+
+# Traction horizontale de 1 MPa (= 1e6 N/m, épaisseur unité) sur le bord droit
+traction tx=1e6 on "right"
+
+output von_mises file=plate_vm.svg  bc
+output stress_xx file=plate_sxx.svg
+output deformed  file=plate_def.svg scale=2000 mesh

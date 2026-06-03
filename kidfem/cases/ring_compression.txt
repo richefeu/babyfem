@@ -1,0 +1,31 @@
+# =====================================================================
+# Anneau sous compression radiale : pression externe uniforme (Lamé).
+#
+# Disque troué (rayon int. a=0.4, ext. b=1.0) soumis à une pression p sur
+# son bord extérieur. Solution analytique de Lamé (indépendante de E, nu) :
+#   sigma_r(r)     = -p b²/(b²-a²) · (1 - a²/r²)
+#   sigma_theta(r) = -p b²/(b²-a²) · (1 + a²/r²)
+# La contrainte circonférentielle est concentrée au bord du trou
+#   sigma_theta(a) = -2 p b²/(b²-a²)  (ici ≈ -2.38 p) -> von Mises max au trou.
+#
+# Géométrie impossible avec babyfem (frontière courbe + trou). La pression
+# seule étant auto-équilibrée, on bloque 3 DDL (modes de corps rigide) sur des
+# nœuds d'axe, choix compatible avec la solution radiale (déplacement nul dans
+# la direction bloquée en ces points).
+# =====================================================================
+
+mesh file=ring.msh
+material E=210e9 nu=0.3
+solver sparse
+
+# Blocage des modes de corps rigide (translations + rotation)
+fix v at node nearest x=1.0  y=0.0     # bord ext. +x : déplacement radial selon x
+fix v at node nearest x=-1.0 y=0.0     # bord ext. -x
+fix u at node nearest x=0.0  y=1.0     # bord ext. +y : déplacement radial selon y
+
+# Compression radiale : 10 MPa sur le bord extérieur
+pressure p=10e6 on "outer"
+
+output von_mises file=ring_vm.svg  bc
+output stress_xx file=ring_sxx.svg
+output deformed  file=ring_def.svg scale=300 mesh
