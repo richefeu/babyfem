@@ -1,0 +1,29 @@
+# =====================================================================
+# Poutre sur 2 appuis sous charge répartie uniforme (poutre continue
+# maillée en 4 tronçons, connexions rigides). Validation :
+#   moment à mi-portée = w L²/8 = 1000·4²/8 = 2000 N·m
+#   flèche maximale     = 5 w L⁴/(384 EI)
+# =====================================================================
+
+section E=210e9 A=1e-3 I=8e-6      # acier, profilé fictif
+
+node 0 x=0 y=0
+node 1 x=1 y=0
+node 2 x=2 y=0
+node 3 x=3 y=0
+node 4 x=4 y=0
+
+# Poutre continue (connexions rigides), charge répartie 1000 N/m vers le bas
+beam 0 1 rigid=both wy=-1000
+beam 1 2 rigid=both wy=-1000
+beam 2 3 rigid=both wy=-1000
+beam 3 4 rigid=both wy=-1000
+
+# Appuis simples aux extrémités
+fix u v at node 0      # articulation
+fix v   at node 4      # appui simple
+
+output structure file=beam_structure.svg
+output deformed  file=beam_deformed.svg scale=200
+output moment    file=beam_moment.svg
+output shear     file=beam_shear.svg

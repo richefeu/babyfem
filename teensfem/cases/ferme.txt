@@ -1,0 +1,32 @@
+# =====================================================================
+# Ferme de toiture (treillis triangulaire) : deux arbalétriers inclinés
+# et un entrait, toutes connexions ARTICULÉES.
+#
+# Les arbalétriers reçoivent une charge répartie PERPENDICULAIRE au versant
+# (wn, repère local), comme une charge de neige/vent normale au toit. Étant
+# articulé à ses deux extrémités, chaque arbalétrier fléchit comme une poutre
+# sur 2 appuis :
+#     M à mi-arbalétrier = wn·L²/8 ,  L = √(3²+2²) = √13 ≈ 3.606 m
+#                        = 2000·13/8 ≈ 3250 N·m
+# tandis que la ferme transmet la charge aux appuis par efforts normaux
+# (compression des arbalétriers, traction de l'entrait).
+# =====================================================================
+
+section E=210e9 A=2e-3 I=5e-6
+
+node 0 x=0 y=0       # appui gauche
+node 1 x=6 y=0       # appui droit
+node 2 x=3 y=2       # faîtage
+
+beam 0 1             # entrait (tirant horizontal)
+beam 0 2 wn=-2000    # arbalétrier gauche, charge ⟂ versant
+beam 2 1 wn=-2000    # arbalétrier droit,  charge ⟂ versant
+
+# Appuis : articulation à gauche, appui simple à droite
+fix u v at node 0
+fix v   at node 1
+
+output structure file=ferme_structure.svg
+output deformed  file=ferme_deformed.svg scale=800
+output moment    file=ferme_moment.svg
+output normal    file=ferme_normal.svg

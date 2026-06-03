@@ -1,0 +1,44 @@
+# =====================================================================
+# exo25 — ferme de toiture en bois (treillis), adaptée à la syntaxe teensFEM.
+#
+# Géométrie, section, appuis et charges identiques à l'énoncé d'origine.
+# Les nœuds A, G, E, B, C, D sont numérotés 0 à 5 (lettre rappelée en commentaire).
+# Treillis : toutes les connexions sont articulées (défaut) -> effort normal seul.
+# =====================================================================
+
+# Bois (résineux de structure) + section circulaire Ø = 0.060 m :
+#   A = π·d²/4 ≈ 2.827e-3 m² ,  I = π·d⁴/64 ≈ 6.362e-7 m⁴
+section E=11e9 A=2.827e-3 I=6.362e-7
+
+node 0 x=0.0 y=0.0       # A
+node 1 x=3.0 y=0.0       # G
+node 2 x=6.0 y=0.0       # E
+node 3 x=1.5 y=0.866     # B
+node 4 x=3.0 y=1.732     # C
+node 5 x=4.5 y=0.866     # D
+
+# Barres (treillis = articulé-articulé par défaut)
+beam 0 1     # A-G
+beam 0 3     # A-B
+beam 3 1     # B-G
+beam 1 2     # G-E
+beam 1 5     # G-D
+beam 5 2     # D-E
+beam 4 3     # C-B
+beam 4 1     # C-G
+beam 4 5     # C-D
+
+# Appuis : A articulation (XY bloqués), E appui simple (Y bloqué)
+fix u v at node 0
+fix v   at node 2
+
+# Charges nodales (N, vers le bas)
+load fy=-450 at node 0    # A
+load fy=-900 at node 3    # B
+load fy=-900 at node 4    # C
+load fy=-900 at node 5    # D
+load fy=-450 at node 2    # E
+
+output structure file=exo25_structure.svg
+output normal    file=exo25_normal.svg
+output deformed  file=exo25_deformed.svg scale=300

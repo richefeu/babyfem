@@ -1,0 +1,31 @@
+# =====================================================================
+# Treillis (king-post) : toutes les connexions sont ARTICULÉES (défaut).
+# Chaque barre ne reprend que de l'effort normal (M ≈ 0) : c'est le
+# comportement de treillis, obtenu sans mot-clé spécial puisque le défaut
+# d'une poutre est rotule-rotule. Les rotations des nœuds, sans raideur,
+# sont bloquées automatiquement.
+# =====================================================================
+
+section E=210e9 A=2e-3 I=1e-6      # l'inertie n'intervient pas (tout articulé)
+
+node 0 x=0 y=0
+node 1 x=2 y=0
+node 2 x=4 y=0
+node 3 x=2 y=1.5     # sommet (king post)
+
+beam 0 1             # membrure inférieure (articulé-articulé)
+beam 1 2
+beam 0 3             # arbalétrier gauche
+beam 3 2             # arbalétrier droit
+beam 1 3             # poinçon vertical
+
+# Appuis : articulation à gauche, appui simple à droite
+fix u v at node 0
+fix v   at node 2
+
+# Charge ponctuelle descendante au nœud central
+load fy=-10000 at node 1
+
+output structure file=truss_structure.svg
+output deformed  file=truss_deformed.svg scale=100
+output normal    file=truss_normal.svg

@@ -1,0 +1,30 @@
+# =====================================================================
+# Portique (portal frame) : deux poteaux encastrés au sol, traverse
+# rigide chargée. Démontre les connexions ENCASTRÉES (rigid=both) :
+# le moment passe dans les angles, le portique reprend l'effort latéral
+# par flexion. Tout est rigide -> les rotations des nœuds sont actives.
+# =====================================================================
+
+section E=210e9 A=5e-3 I=1e-4      # acier, profilé de portique
+
+node 0 x=0 y=0       # pied gauche
+node 1 x=0 y=3       # angle gauche
+node 2 x=4 y=3       # angle droit
+node 3 x=4 y=0       # pied droit
+
+beam 0 1 rigid=both                 # poteau gauche
+beam 1 2 rigid=both wy=-3000        # traverse, charge répartie 3 kN/m
+beam 2 3 rigid=both                 # poteau droit
+
+# Pieds encastrés
+fix u v r at node 0
+fix u v r at node 3
+
+# Effort latéral (vent) en tête
+load fx=8000 at node 1
+
+output structure file=portal_structure.svg
+output deformed  file=portal_deformed.svg scale=60
+output moment    file=portal_moment.svg
+output normal    file=portal_normal.svg
+output shear     file=portal_shear.svg

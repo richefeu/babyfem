@@ -1,0 +1,41 @@
+# =====================================================================
+# exo25-true — même ferme bois que exo25, avec le chargement "réel" :
+# les barres du HAUT (arbalétriers A-B, B-C, C-D, D-E) reçoivent une charge
+# uniformément répartie VERTICALE de 600 N/m (poids de couverture), au lieu de
+# charges ponctuelles aux nœuds.
+#
+# Étant articulés à leurs deux extrémités, les arbalétriers fléchissent
+# localement (poutre sur 2 appuis) EN PLUS de l'effort normal de treillis :
+# le diagramme de moment n'est donc plus nul sur ces barres.
+# =====================================================================
+
+section E=11e9 A=2.827e-3 I=6.362e-7
+
+node 0 x=0.0 y=0.0       # A
+node 1 x=3.0 y=0.0       # G
+node 2 x=6.0 y=0.0       # E
+node 3 x=1.5 y=0.866     # B
+node 4 x=3.0 y=1.732     # C
+node 5 x=4.5 y=0.866     # D
+
+# Membrure inférieure et âme (sans charge répartie)
+beam 0 1     # A-G
+beam 1 2     # G-E
+beam 3 1     # B-G
+beam 1 5     # G-D
+beam 4 1     # C-G
+
+# Barres du haut (arbalétriers) : charge verticale répartie 600 N/m
+beam 0 3 wy=-600    # A-B
+beam 3 4 wy=-600    # B-C
+beam 4 5 wy=-600    # C-D
+beam 5 2 wy=-600    # D-E
+
+# Appuis : A articulation (XY), E appui simple (Y)
+fix u v at node 0
+fix v   at node 2
+
+output structure file=exo25-true_structure.svg
+output normal    file=exo25-true_normal.svg
+output moment    file=exo25-true_moment.svg
+output deformed  file=exo25-true_deformed.svg scale=200

@@ -2,7 +2,7 @@
 # Construit chaque outil dans son sous-dossier (chacun a son propre Makefile).
 # Les briques numériques communes vivent dans core/ (en-têtes, rien à compiler).
 
-TOOLS := babyfem kidfem
+TOOLS := babyfem kidfem teensfem
 
 .PHONY: all $(TOOLS) examples clean
 
@@ -17,6 +17,7 @@ examples:
 	@$(MAKE) --no-print-directory -C babyfem/examples
 
 clean:
-	@$(MAKE) --no-print-directory -C babyfem clean
-	@$(MAKE) --no-print-directory -C kidfem  clean
+	@$(MAKE) --no-print-directory -C babyfem  clean
+	@$(MAKE) --no-print-directory -C kidfem   clean
+	@$(MAKE) --no-print-directory -C teensfem clean
 	@$(MAKE) --no-print-directory -C babyfem/examples clean

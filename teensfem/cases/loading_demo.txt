@@ -1,0 +1,38 @@
+# =====================================================================
+# Démonstration du schéma de chargement : un même modèle réunit tous les
+# types de liaisons et de charges, pour la sortie `output structure`.
+#   Liaisons d'appui : encastrement (n0), articulation (n3), appui simple (n5)
+#   Liaison interne  : rotule en bout de barre (poutre 2-4, côté n2)
+#   Charges          : force nodale (n1), moment nodal (n4),
+#                      répartie globale (poutre 1-2), répartie ⟂ (console 4-6)
+# =====================================================================
+
+section E=210e9 A=5e-3 I=1e-4
+
+node 0 x=0    y=0
+node 1 x=0    y=3
+node 2 x=5    y=3
+node 3 x=5    y=0
+node 4 x=10   y=3
+node 5 x=10   y=0
+node 6 x=12.5 y=4.2     # extrémité de console (inclinée)
+
+beam 0 1 rigid=both
+beam 1 2 rigid=both wy=-2000      # charge répartie globale (gravité)
+beam 2 3 rigid=both
+beam 2 4 rigid=end                # ROTULE au nœud 2 (rigide au nœud 4)
+beam 4 5 rigid=both
+beam 4 6 rigid=both wn=-1500      # console inclinée, charge ⟂ au versant
+
+# Liaisons d'appui : les trois types
+fix u v r at node 0     # encastrement
+fix u v   at node 3     # articulation
+fix v     at node 5     # appui simple
+
+# Charges nodales
+load fx=6000  at node 1     # force horizontale
+load m=12000  at node 4     # moment
+
+output structure file=loading_demo.svg width=950
+output deformed  file=loading_demo_def.svg scale=120
+output moment    file=loading_demo_M.svg

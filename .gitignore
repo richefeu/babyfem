@@ -10,6 +10,7 @@ compile_commands.json
 # Binaires des outils (générés dans leur dossier)
 babyfem/babyfem
 kidfem/kidfem
+teensfem/teensfem
 babyfem/examples/three_span_beam
 babyfem/examples/test_glace
 

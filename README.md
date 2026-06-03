@@ -12,7 +12,7 @@ babyFEM → kidFEM → teensFEM → adultFEM → seniorFEM
 |---|---|---|
 | **[babyFEM](babyfem/)** | grille rectangulaire structurée, quadrangles Q1, élasticité linéaire | ✅ |
 | **[kidFEM](kidfem/)** | maillages triangulaires non structurés (import gmsh), géométries quelconques | ✅ |
-| teensFEM | éléments d'ordre supérieur, plane stress/strain au choix | à venir |
+| **[teensFEM](teensfem/)** | structures à barres/poutres 2D (portiques, treillis), articulations & encastrements | ✅ |
 | adultFEM | non-linéarité / dynamique | à venir |
 | seniorFEM | 3D, multi-physique | à venir |
 
@@ -35,6 +35,7 @@ core/        Briques numériques partagées (en-têtes seuls)
 
 babyfem/     Outil 1 — grille structurée (voir babyfem/README.md)
 kidfem/      Outil 2 — maillages triangulaires gmsh (voir kidfem/README.md)
+teensfem/    Outil 3 — structures à barres/poutres (voir teensfem/README.md)
 
 Makefile     Construit tous les outils
 ```
@@ -47,29 +48,32 @@ chaque outil garde **sa** version, pour préserver la lisibilité pédagogique.
 ## Compilation
 
 ```bash
-make            # construit babyfem et kidfem
+make            # construit babyfem, kidfem et teensfem
 make babyfem    # un seul outil
 make kidfem
+make teensfem
 make examples   # exemples C++ historiques de babyfem
 make clean
 ```
 
 Chaque binaire est généré dans le dossier de son outil (`babyfem/babyfem`,
-`kidfem/kidfem`).
+`kidfem/kidfem`, `teensfem/teensfem`).
 
 ## Utilisation
 
 Chaque outil lit un problème décrit dans un fichier texte :
 
 ```bash
-babyfem/babyfem babyfem/cases/three_span.txt
-kidfem/kidfem   kidfem/cases/ring_compression.txt
+babyfem/babyfem   babyfem/cases/three_span.txt
+kidfem/kidfem     kidfem/cases/ring_compression.txt
+teensfem/teensfem teensfem/cases/portal.txt
 ```
 
 Voir le README de chaque outil pour la grammaire détaillée du fichier de
 problème :
 - [babyfem/README.md](babyfem/README.md)
 - [kidfem/README.md](kidfem/README.md)
+- [teensfem/README.md](teensfem/README.md)
 
 ## Licence
 
