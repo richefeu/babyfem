@@ -1,8 +1,12 @@
 <p align="center">
-<img src="./babyFEM-logo.png" width="40%"/>
+<img src="../babyFEM-logo.png" width="40%"/>
 </p>
 
 # babyFEM
+
+Premier outil de la série (voir le [README racine](../README.md) :
+babyFEM → kidFEM → teensFEM → adultFEM → seniorFEM).
+
 
 Solveur éléments finis 2D pour l'élasticité linéaire, en C++17 pur, sans dépendances externes.
 

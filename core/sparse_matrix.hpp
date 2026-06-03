@@ -2,6 +2,7 @@
 #include <vector>
 #include <cmath>
 #include <stdexcept>
+#include <map>
 
 // Sparse matrix in CSR (Compressed Sparse Row) format
 class SparseMatrix {
@@ -41,36 +42,29 @@ public:
         throw std::runtime_error("SparseMatrix::add requires pre-allocated structure");
     }
 
-    // Convert from triplet format (for easy assembly)
+    // Convert from triplet format (for easy assembly).
+    // Les triplets en double (même (i, j)) sont sommés, et chaque ligne est
+    // stockée avec ses colonnes triées — quel que soit l'ordre d'entrée.
     static SparseMatrix from_triplet(int rows, int cols,
                                      const std::vector<int>& row_idx,
                                      const std::vector<int>& col_idx,
                                      const std::vector<double>& values) {
         SparseMatrix mat(rows, cols);
 
-        // Count non-zeros per row
-        std::vector<int> row_counts(rows, 0);
-        for (int r : row_idx) {
-            row_counts[r]++;
+        // Accumuler par ligne : colonne -> valeur sommée
+        std::vector<std::map<int, double>> rows_acc(rows);
+        for (int k = 0; k < static_cast<int>(row_idx.size()); ++k) {
+            rows_acc[row_idx[k]][col_idx[k]] += values[k];
         }
 
-        // Build row pointers
+        // Construire le CSR (colonnes triées grâce à std::map)
         mat.row_ptr_[0] = 0;
         for (int i = 0; i < rows; ++i) {
-            mat.row_ptr_[i + 1] = mat.row_ptr_[i] + row_counts[i];
-        }
-
-        mat.values_.resize(row_idx.size());
-        mat.col_indices_.resize(row_idx.size());
-
-        // Fill matrix (assuming input is sorted by row)
-        std::vector<int> row_pos = row_counts;
-        for (int k = 0; k < static_cast<int>(row_idx.size()); ++k) {
-            int i = row_idx[k];
-            int pos = mat.row_ptr_[i] + row_counts[i] - row_pos[i];
-            mat.values_[pos] = values[k];
-            mat.col_indices_[pos] = col_idx[k];
-            row_pos[i]--;
+            for (const auto& [col, val] : rows_acc[i]) {
+                mat.col_indices_.push_back(col);
+                mat.values_.push_back(val);
+            }
+            mat.row_ptr_[i + 1] = static_cast<int>(mat.values_.size());
         }
 
         return mat;

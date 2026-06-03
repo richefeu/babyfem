@@ -4,9 +4,14 @@ bin/
 *.a
 *.so
 *.dylib
+*.dSYM/
+compile_commands.json
 
-# Binaire principal
-/babyfem
+# Binaires des outils (générés dans leur dossier)
+babyfem/babyfem
+kidfem/kidfem
+babyfem/examples/three_span_beam
+babyfem/examples/test_glace
 
 # Generated output files
 *.svg
@@ -17,6 +22,12 @@ bin/
 # OS files
 .DS_Store
 Thumbs.db
+# macOS custom folder icon (file is "Icon" followed by a carriage return)
+Icon?
+._*
+.AppleDouble
+.Spotlight-V100
+.Trashes
 
 # IDE
 .vscode/

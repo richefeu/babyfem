@@ -40,7 +40,13 @@ public:
         SparseVector r = subtract(b, A.multiply(x));
         double rsold = dot(r, r);
 
-        if (rsold < opts.tolerance * opts.tolerance) {
+        // Critère relatif (invariant d'échelle) : ‖r‖ <= tol * ‖b‖.
+        // Repli sur un critère absolu si b est (quasi) nul.
+        double bnorm2 = dot(b, b);
+        double threshold = opts.tolerance * opts.tolerance
+                           * (bnorm2 > 0.0 ? bnorm2 : 1.0);
+
+        if (rsold <= threshold) {
             return x; // Already converged
         }
 
@@ -80,7 +86,7 @@ public:
             }
 
             // Check convergence
-            if (rsnew < opts.tolerance * opts.tolerance) {
+            if (rsnew <= threshold) {
                 if (opts.verbose) {
                     std::cout << "CG converged in " << (iter + 1) << " iterations\n";
                 }

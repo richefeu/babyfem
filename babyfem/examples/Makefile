@@ -8,7 +8,7 @@ TARGETS := $(patsubst %.cpp,%,$(SRCS))
 all: $(TARGETS)
 
 %: %.cpp
-	$(CXX) $(CXXFLAGS) -I$(SRCDIR) $< -o $@
+	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I../../core $< -o $@
 	@echo "✓ $@"
 
 clean:

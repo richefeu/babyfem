@@ -6,6 +6,7 @@
 #include <cmath>
 #include <map>
 #include <array>
+#include <limits>
 
 class ElasticityFEM2D {
 public:
@@ -73,51 +74,30 @@ public:
         return 2 * node_idx(i, j) + 1;
     }
 
-    // Sélectionne les nœuds sur une limite entre deux positions
-    std::vector<int> select_nodes_on_line(const std::string& boundary,
-                                          double coord_min = -1e308,
-                                          double coord_max = 1e308) const {
+    // Sélectionne les nœuds d'un bord dont la coordonnée le long de ce bord
+    // tombe dans [coord_min, coord_max]. Par défaut : tout le bord.
+    std::vector<int> select_nodes_on_line(
+            const std::string& boundary,
+            double coord_min = std::numeric_limits<double>::lowest(),
+            double coord_max = std::numeric_limits<double>::max()) const {
         std::vector<int> nodes;
-        double x_min = coord_min, x_max = coord_max;
-        double y_min = coord_min, y_max = coord_max;
+        const double eps = 1e-10;
 
-        if (boundary == "bottom") {
-            if (x_min < -1e308) x_min = 0.0;
-            if (x_max > 1e308) x_max = width;
+        if (boundary == "bottom" || boundary == "top") {
+            int j = (boundary == "bottom") ? 0 : ny - 1;
             for (int i = 0; i < nx; ++i) {
-                double x = i * (width / (nx - 1));
-                if (x >= x_min - 1e-10 && x <= x_max + 1e-10) {
-                    nodes.push_back(node_idx(i, 0));
+                double x = i * dx;
+                if (x >= coord_min - eps && x <= coord_max + eps) {
+                    nodes.push_back(node_idx(i, j));
                 }
             }
         }
-        else if (boundary == "top") {
-            if (x_min < -1e308) x_min = 0.0;
-            if (x_max > 1e308) x_max = width;
-            for (int i = 0; i < nx; ++i) {
-                double x = i * (width / (nx - 1));
-                if (x >= x_min - 1e-10 && x <= x_max + 1e-10) {
-                    nodes.push_back(node_idx(i, ny - 1));
-                }
-            }
-        }
-        else if (boundary == "left") {
-            if (y_min < -1e308) y_min = 0.0;
-            if (y_max > 1e308) y_max = height;
+        else if (boundary == "left" || boundary == "right") {
+            int i = (boundary == "left") ? 0 : nx - 1;
             for (int j = 0; j < ny; ++j) {
-                double y = j * (height / (ny - 1));
-                if (y >= y_min - 1e-10 && y <= y_max + 1e-10) {
-                    nodes.push_back(node_idx(0, j));
-                }
-            }
-        }
-        else if (boundary == "right") {
-            if (y_min < -1e308) y_min = 0.0;
-            if (y_max > 1e308) y_max = height;
-            for (int j = 0; j < ny; ++j) {
-                double y = j * (height / (ny - 1));
-                if (y >= y_min - 1e-10 && y <= y_max + 1e-10) {
-                    nodes.push_back(node_idx(nx - 1, j));
+                double y = j * dy;
+                if (y >= coord_min - eps && y <= coord_max + eps) {
+                    nodes.push_back(node_idx(i, j));
                 }
             }
         }
@@ -230,22 +210,18 @@ public:
         return K;
     }
 
-    // Applique une condition aux limites (DDL fixe) avec CONSTRAINT ELIMINATION
-    // au lieu de la méthode des pénalités (qui casse le couplage)
+    // Applique une condition de Dirichlet (DDL imposé) par élimination de
+    // contrainte : on reporte la contribution du DDL contraint au second
+    // membre, puis on annule sa ligne et sa colonne et on fixe la diagonale.
     void apply_dirichlet(Matrix& K, Vector& F, int dof, double value) const {
-        // FIX: Use constraint elimination instead of penalty method
-        // Subtract the contribution of this constrained DOF from all equations
-        // F[i] -= K[i, dof] * value for all i
-        // Then zero row and column to implement the constraint
-
+        // Reporter la contribution du DDL contraint : F[i] -= K(i, dof) * value
         for (int i = 0; i < K.rows(); ++i) {
             if (i != dof) {
                 F[i] -= K(i, dof) * value;
             }
         }
 
-        // Now apply the penalty method ON TOP of constraint elimination
-        // This preserves the coupling better
+        // Annuler ligne et colonne, puis fixer la contrainte sur la diagonale.
         for (int j = 0; j < K.cols(); ++j) {
             K(dof, j) = 0.0;
         }
@@ -361,26 +337,25 @@ public:
             F[dof] += value;
         }
 
-        for (int i = 0; i < nx; ++i) {
-            for (int j = 0; j < ny; ++j) {
-                // Ajouter les contributions de l'élément
-                if (i < nx - 1 && j < ny - 1) {
-                    Matrix K_local = local_stiffness_q1();
-                    std::array<int, 8> dofs = {
-                        dof_u(i, j), dof_v(i, j),
-                        dof_u(i+1, j), dof_v(i+1, j),
-                        dof_u(i+1, j+1), dof_v(i+1, j+1),
-                        dof_u(i, j+1), dof_v(i, j+1)
-                    };
+        // Maillage régulier : la rigidité élémentaire est identique pour tous
+        // les éléments, on la calcule donc une seule fois.
+        Matrix K_local = local_stiffness_q1();
+        for (int i = 0; i < nx - 1; ++i) {
+            for (int j = 0; j < ny - 1; ++j) {
+                std::array<int, 8> dofs = {
+                    dof_u(i, j), dof_v(i, j),
+                    dof_u(i+1, j), dof_v(i+1, j),
+                    dof_u(i+1, j+1), dof_v(i+1, j+1),
+                    dof_u(i, j+1), dof_v(i, j+1)
+                };
 
-                    for (int local_i = 0; local_i < 8; ++local_i) {
-                        for (int local_j = 0; local_j < 8; ++local_j) {
-                            double val = K_local(local_i, local_j);
-                            if (std::abs(val) > 1e-15) {
-                                row_idx.push_back(dofs[local_i]);
-                                col_idx.push_back(dofs[local_j]);
-                                values.push_back(val);
-                            }
+                for (int local_i = 0; local_i < 8; ++local_i) {
+                    for (int local_j = 0; local_j < 8; ++local_j) {
+                        double val = K_local(local_i, local_j);
+                        if (std::abs(val) > 1e-15) {
+                            row_idx.push_back(dofs[local_i]);
+                            col_idx.push_back(dofs[local_j]);
+                            values.push_back(val);
                         }
                     }
                 }
