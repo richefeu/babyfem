@@ -1,0 +1,33 @@
+# =====================================================================
+# Poutre longue et mince sur 3 appuis simples, avec charges ponctuelles
+# Transcription de examples/three_span_beam.cpp dans le format texte.
+# =====================================================================
+
+# Geometrie : poutre 1.0 x 0.1 m (rapport L/h = 10, poutre mince)
+mesh width=1.0 height=0.1 nx=100 ny=10
+
+# Materiau : acier
+material E=210e9 nu=0.3
+
+# Solveur direct (elimination de Gauss)
+solver dense
+
+# --- Conditions aux limites (deplacements imposes) -------------------
+
+# Blocage lateral : u = 0 au coin bas-gauche (empeche le mouvement rigide)
+fix u at node 0
+
+# 3 appuis simples (v = 0) a x = 0, 0.5 et 1.0
+# La plage couvre +/- 1.5 * dx_noeud autour de chaque appui.
+fix v on bottom where x in [-0.015152, 0.015152]
+fix v on bottom where x in [0.484848, 0.515152]
+fix v on bottom where x in [0.984848, 1.015152]
+
+# Charges : deplacement impose v = -2e-4 au milieu de chaque travee
+set v=-0.0002 on top where x in [0.23, 0.27]
+set v=-0.0002 on top where x in [0.73, 0.77]
+
+# --- Sorties ---------------------------------------------------------
+output mesh      file=three_span_mesh.svg       margin=0.1 bc
+output von_mises file=three_span_von_mises.svg   margin=0.5 bc
+output deformed  file=three_span_deformed.svg    margin=0.5 scale=100 mesh

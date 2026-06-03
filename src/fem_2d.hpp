@@ -256,15 +256,26 @@ public:
         F[dof] = value;
     }
 
+    // Ajoute les forces nodales imposées (Neumann) au second membre F.
+    // nodal_forces : liste de (node_idx, composante 0=u/1=v, valeur).
+    void apply_nodal_forces(Vector& F,
+                            const std::vector<std::tuple<int, int, double>>& nodal_forces) const {
+        for (const auto& [node, comp, value] : nodal_forces) {
+            auto [i, j] = get_coords(node);
+            int dof = (comp == 0) ? dof_u(i, j) : dof_v(i, j);
+            F[dof] += value;
+        }
+    }
+
     // Résout le système avec conditions aux limites
     void solve(const std::map<std::string, std::vector<std::pair<int, double>>>& bcs,
-               const std::vector<std::tuple<int, int, double>>& node_bcs = {}) {
+               const std::vector<std::tuple<int, int, double>>& node_bcs = {},
+               const std::vector<std::tuple<int, int, double>>& nodal_forces = {}) {
         Matrix K = assemble_global_matrix();
         Vector F(n_dof, 0.0);
 
-        // Diagnostic: Vérifier quelques entrées de la matrice avant BCs
-        double K_sample_uu = K(dof_u(nx/2, ny/2), dof_u(nx/2, ny/2));  // Stiffness at interior u DOF
-        std::cout << "DEBUG: K(" << dof_u(nx/2, ny/2) << "," << dof_u(nx/2, ny/2) << ") = " << K_sample_uu << "\n";
+        // Forces de Neumann : alimentent F AVANT l'application des CL de Dirichlet.
+        apply_nodal_forces(F, nodal_forces);
 
         // Appliquer les conditions aux limites sur les bords
         for (const auto& [boundary, bc_list] : bcs) {
@@ -336,11 +347,19 @@ public:
     // Résout le système avec conditions aux limites (version sparse avec Conjugate Gradient)
     void solve_sparse(const std::map<std::string, std::vector<std::pair<int, double>>>& bcs,
                       const std::vector<std::tuple<int, int, double>>& node_bcs = {},
+                      const std::vector<std::tuple<int, int, double>>& nodal_forces = {},
                       const SparseSolver::Options& solver_opts = SparseSolver::Options()) {
         // Assembler en format triplet
         std::vector<int> row_idx, col_idx;
         std::vector<double> values;
         std::vector<double> F(n_dof, 0.0);
+
+        // Forces de Neumann : alimentent F AVANT l'application des CL de Dirichlet.
+        for (const auto& [node, comp, value] : nodal_forces) {
+            auto [i, j] = get_coords(node);
+            int dof = (comp == 0) ? dof_u(i, j) : dof_v(i, j);
+            F[dof] += value;
+        }
 
         for (int i = 0; i < nx; ++i) {
             for (int j = 0; j < ny; ++j) {

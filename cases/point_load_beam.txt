@@ -1,0 +1,30 @@
+# =====================================================================
+# Poutre sur 2 appuis simples, FORCE ponctuelle centrale (Neumann).
+#
+# Contrairement aux autres cas, la charge n'est PAS un deplacement impose
+# mais une vraie force : le deplacement est l'inconnue. On peut comparer la
+# fleche calculee a la theorie des poutres (Euler-Bernoulli) :
+#
+#     delta_max = P * L^3 / (48 * E * I) ,   I = b * h^3 / 12  (ici b = 1)
+#
+# Avec L=1, h=0.1, E=210e9, P=1e5 N :
+#     I = 0.1^3 / 12 = 8.333e-5
+#     delta = 1e5 * 1 / (48 * 210e9 * 8.333e-5) ~ 1.19e-4 m
+# (l'EF en deformations planes est un peu plus raide => ordre de grandeur).
+# =====================================================================
+
+mesh width=1.0 height=0.1 nx=101 ny=11
+material E=210e9 nu=0.3
+solver sparse
+
+# Appuis simples aux deux extremites de la base (v = 0)
+fix v on bottom where x in [0.0, 0.005]
+fix v on bottom where x in [0.995, 1.0]
+# Blocage horizontal pour empecher le mouvement de corps rigide
+fix u at node 0
+
+# Force ponctuelle descendante de 1e5 N au centre du bord superieur
+force fy=-100000 on top where x in [0.495, 0.505]
+
+output von_mises file=point_load_von_mises.svg margin=0.3 bc
+output deformed  file=point_load_deformed.svg  margin=0.3 scale=200 mesh

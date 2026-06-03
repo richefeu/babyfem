@@ -5,6 +5,9 @@ bin/
 *.so
 *.dylib
 
+# Binaire principal
+/babyfem
+
 # Generated output files
 *.svg
 *.csv

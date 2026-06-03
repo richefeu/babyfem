@@ -1,0 +1,32 @@
+# =====================================================================
+# Poutre appuyee avec charge repartie centrale ("test_glace")
+# Transcription de examples/test_glace.cpp dans le format texte.
+# =====================================================================
+
+# Geometrie : poutre mince 0.1 x 0.02 m, maillage fin
+mesh width=0.1 height=0.02 nx=240 ny=24
+
+# Materiau : acier
+material E=210e9 nu=0.3
+
+# Solveur iteratif (gradient conjugue, matrice creuse)
+solver sparse
+
+# --- Conditions aux limites (deplacements imposes) -------------------
+
+# Blocage lateral : u = 0 au coin bas-gauche
+fix u at node 0
+
+# Appuis simples (v = 0) sur le premier et le dernier tiers de la base
+fix v on bottom where x in [0.0, 0.033333]
+fix v on bottom where x in [0.066667, 0.1]
+
+# Charge repartie : v = -1e-4 sur le tiers central du bord superieur
+set v=-0.0001 on top where x in [0.031333, 0.068667]
+
+# --- Sorties ---------------------------------------------------------
+output von_mises file=test_glace_von_mises.svg margin=0.05
+output stress_xx file=test_glace_stress_xx.svg margin=0.05
+output stress_yy file=test_glace_stress_yy.svg margin=0.05
+output stress_xy file=test_glace_stress_xy.svg margin=0.05
+output deformed  file=test_glace_deformed.svg  margin=0.05 scale=10 mesh
