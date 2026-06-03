@@ -19,6 +19,9 @@ babyfem/examples/test_glace
 *.dat
 *.out
 
+# Maillages générés par gmsh (régénérables depuis les .geo)
+*.msh
+
 # OS files
 .DS_Store
 Thumbs.db
