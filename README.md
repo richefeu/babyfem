@@ -17,8 +17,10 @@ babyFEM → kidFEM → teensFEM → adultFEM → seniorFEM
 | seniorFEM | 3D, multi-physique | à venir |
 
 <p align="center">
-<img src="./babyFEM-logo.png" width="32%"/>
-<img src="./kidFEM-logo.png" width="32%"/>
+<img src="./babyFEM-logo.png" width="24%"/>
+<img src="./kidFEM-logo.png" width="24%"/>
+<img src="./teensFEM-logo.png" width="24%"/>
+<img src="./adultFEM-logo.png" width="24%"/>
 </p>
 
 ## Organisation du dépôt
